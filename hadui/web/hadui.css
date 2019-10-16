@@ -1,0 +1,74 @@
+/**
+ * hadui.css
+*/
+
+body {
+  margin: 1px;
+  padding: 1px 1px 1px 9pt;
+  background: #383831;
+  color: #f8f8f2;
+}
+
+.LogArea {
+  display: block;
+  flex: unset; /* will prevent resize if set */
+  overflow: scroll;
+  resize: vertical;
+  margin: 1px 1px;
+  padding: 2px 5px 5px 2px; /* ensure resize handle visible */
+  border: 1px solid silver;
+  background-color: #30312a;
+  width: 96%;
+  height: 120pt;
+  min-height: 12pt;
+}
+
+.LogBox {
+  display: flex;
+  flex-flow: column nowrap;
+  flex: unset;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+
+  padding: 3px 1px;
+  margin: 0;
+  border: none;
+
+  font-family: monospace;
+  font-size: 9pt;
+}
+
+.LogBox .ts,
+.LogBox .msg,
+.LogBox .err-msg {
+  font-family: monospace;
+  margin: 1px 1px;
+  padding: 0;
+  line-height: 1;
+}
+
+.LogBox .ts {
+  margin-right: 6pt;
+  color: #43a5e2;
+}
+
+.LogBox .msg {
+  color: #cfa900;
+}
+
+.LogBox .err-msg {
+  color: #bb5500;
+}
+
+.CodeMirror {
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  line-height: 1.3;
+  width: 98%;
+  height: auto;
+}
+
+.CodeMirror-linenumbers {
+  padding: 0 8px;
+}

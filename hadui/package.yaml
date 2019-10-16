@@ -1,0 +1,61 @@
+name: hadui
+version: 0.1.0.0
+github: complyue/hadui
+license: BSD3
+author: Compl Yue
+maintainer: compl.yue@icloud.com
+copyright: 2019 Compl Yue
+
+extra-source-files:
+  - README.md
+  - ChangeLog.md
+
+data-files:
+  - web/**/*
+
+synopsis: Web front UI for interactive stack projects
+category: Development Web
+
+description: Please see the README on Github at <https://github.com/complyue/hadui>
+
+dependencies:
+  - ghc >= 8.6
+  - unix
+
+  - base
+  - rio
+  - directory
+  - yaml
+  - unliftio
+  - network
+  - websockets
+  - snap-core
+  - snap-server
+  - containers
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-record-updates
+  - -Wincomplete-uni-patterns
+  - -Wpartial-fields
+  - -Wredundant-constraints
+
+library:
+  source-dirs: src
+
+executables:
+  hadui:
+    main: Main.hs
+    source-dirs: app
+    dependencies:
+      - hadui
+
+    ghc-options:
+      # first process of hadui itself handles light http traffics only,
+      # no need of much parallelism, but more than 1 native threads may
+      # help to avoid quirks in single-threaded cooperative scheduling.
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-maxN2
