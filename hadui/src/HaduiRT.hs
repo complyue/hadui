@@ -27,9 +27,11 @@ import           RIO                     hiding ( unlines
                                                 , unwords
                                                 )
 import           RIO.Text
-import           RIO.Process                    ( HasProcessContext(..)
-                                                , ProcessContext
-                                                )
+
+import           System.Posix.Types
+import           System.Posix.Process
+import           System.Posix.IO                ( closeFd )
+
 import           UnliftIO.Concurrent
 import           UnliftIO.Process
 import           RIO.FilePath
@@ -38,8 +40,6 @@ import qualified System.Directory              as D
 
 import           Data.Yaml.Aeson
 
-import           System.Posix.IO                ( closeFd )
-import           System.Posix.Types
 
 import           Network.Socket
 
@@ -52,18 +52,20 @@ loadConfig :: IO (FilePath, HaduiConfig)
 loadConfig =
     readProcessWithExitCode "/usr/bin/env"
                             ["stack", "path", "--project-root"]
-                            []
+                            ""
         >>= \case
                 (ExitSuccess, outBytes, "") ->
                     let stackPrjRoot  = (unpack . strip . pack) outBytes
                         haduiYamlFile = stackPrjRoot </> "hadui.yaml"
                     in  D.doesFileExist haduiYamlFile
                             >>= \case
-                                    True  -> decodeFileThrow haduiYamlFile
+                                    -- *** XXX this always segfault in ws subprocess
+                                    -- True -> decodeFileThrow haduiYamlFile
                                     -- parse empty dict for all defaults
-                                    False -> decodeThrow "{}"
+                                    _ -> decodeThrow "{}"
                             >>= \cfg -> return (stackPrjRoot, cfg)
                 _ -> error "Can not determine stack project root."
+
 
 data HaduiConfig = HaduiConfig {
     bindInterface :: Text
@@ -72,6 +74,7 @@ data HaduiConfig = HaduiConfig {
     , logLevel :: Text
     , withGHC :: Text
     , ghciOptions :: [Text]
+    , ghcOptions :: [Text]
     } deriving (Eq,Show )
 
 instance FromJSON HaduiConfig where
@@ -88,12 +91,15 @@ instance FromJSON HaduiConfig where
             .!= 5051
             <*> v
             .:? "log-level"
-            .!= "INFO"
+            .!= "DEBUG"
             <*> v
             .:? "with-ghc"
-            .!= "ghc"
+            .!= "ghc-ife" -- TODO default to ghc once ':frontend' cmd is supported officially
             <*> v
             .:? "ghci-options"
+            .!= ["-fobject-code"]
+            <*> v
+            .:? "ghc-options"
             .!= []
     parseJSON _ = fail "Expected Object for Config value"
 
@@ -115,14 +121,10 @@ data HaduiFirstProcess = HaduiFirstProcess {
     , haduiResourceRoot :: FilePath
     , haduiConfig :: HaduiConfig
     , appLogFunc :: !LogFunc
-    , appProcessContext :: !ProcessContext
     }
 
 instance HasLogFunc HaduiFirstProcess where
     logFuncL = lens appLogFunc (\x y -> x { appLogFunc = y })
-instance HasProcessContext HaduiFirstProcess where
-    processContextL =
-        lens appProcessContext (\x y -> x { appProcessContext = y })
 
 
 runHadUI :: RIO HaduiFirstProcess ()
@@ -138,8 +140,11 @@ runHadUI = do
         $  "hadui using resource dir: ["
         <> fromString (haduiResourceRoot app)
         <> "]"
+    logDebug $ "hadui with-ghc: \n  " <> display (withGHC cfg)
     logDebug $ "hadui ghci-options: \n" <> display
         (unlines $ ("  " <>) <$> ghciOptions cfg)
+    logDebug $ "hadui ghc-options: \n" <> display
+        (unlines $ ("  " <>) <$> ghcOptions cfg)
 
 
     addrs <- liftIO $ getAddrInfo
@@ -157,13 +162,13 @@ runHadUI = do
             return sock
         wsFailure :: SomeException -> RIO HaduiFirstProcess ()
         wsFailure exc =
-            logError $ "hadui failed with ws - " <> display (tshow exc)
+            logError $ "hadui failed with ws: " <> display (tshow exc)
 
     -- serve websockets in background threads
     for_ addrs $ \addr -> do
         _ <- forkIO $ handle wsFailure $ bracket (liftIO $ listenWS addr)
                                                  (liftIO . close)
-                                                 servWS
+                                                 upstartHandler
         return ()
     -- continue to serve http in main thread
 
@@ -178,10 +183,19 @@ runHadUI = do
             Left  exc -> error $ "hadui unexpected encoding error: " ++ show exc
             Right msg -> runRIO app $ logError $ display msg
         httpListening httpInfo = runRIO app $ do
-            listenAddrs <- liftIO
-                $ sequence (getSocketName <$> getStartupSockets httpInfo)
-            logInfo $ "hadui available at: " <> (display . unwords)
-                (("http://" <>) . tshow <$> listenAddrs)
+            logInfo
+                $  display
+                $  "hadui available at: http://"
+                <> bindInterface cfg
+                <> ":"
+                <> tshow (httpPort cfg)
+            -- TODO local network package built into hadui is incompatible with
+            --      that built into snap-server package, the network package matters.
+            -- listenAddrs <- liftIO
+            --     $ sequence (getSocketName <$> getStartupSockets httpInfo)
+            -- logInfo $ "hadui available at: " <> (display . unwords)
+            --     (("http://" <>) . tshow <$> listenAddrs)
+            pure ()
 
         dirServCfg   = fancyDirectoryConfig
         prjResRoot   = stackProjectRoot app </> "hadui"
@@ -205,51 +219,92 @@ runHadUI = do
         <|> serveDirectoryWith dirServCfg haduiResRoot
 
 
-servWS :: Socket -> RIO HaduiFirstProcess ()
-servWS sock = do
+upstartHandler :: Socket -> RIO HaduiFirstProcess ()
+upstartHandler sock = do
     app  <- ask
 
     addr <- liftIO $ getSocketName sock
     logInfo $ "hadui listening ws://" <> display (tshow addr)
 
     let cfg            = haduiConfig app
-        !ghcExecutable = show $ withGHC cfg
-        !extraOpts =
-            RIO.concat [ ["--ghci-options", show opt] | opt <- ghciOptions cfg ]
+        !ghcExecutable = unpack $ withGHC cfg
+        !extraOpts     = RIO.concat
+            (  [ ["--ghci-options", show opt] | opt <- ghciOptions cfg ]
+            ++ [ ["--ghc-options", show opt] | opt <- ghcOptions cfg ]
+            )
 
-        acceptWSC = do
-            (conn, wsPeerAddr) <- liftIO $ accept sock
-            logDebug $ "hadui ws accepted: " <> display (tshow wsPeerAddr)
-            return conn
-        closeHandle conn = liftIO $ do
+        acceptWSC = liftIO $ accept sock
+        closeHandle (conn, wsPeerAddr) = liftIO $ do
             wsfd <- unsafeFdSocket conn
             closeFd $ Fd wsfd
 
-        spawnHandler conn = do
-            wsfd <- liftIO $ unsafeFdSocket conn
+        spawnHandler (conn, wsPeerAddr) = do
+            logDebug $ "hadui ws accepted: " <> display (tshow wsPeerAddr)
+            liftIO $ do
+                wsfd <- unsafeFdSocket conn
 
-            _    <- createProcess $ (proc
-                                        "/usr/bin/env"
-                                        (  [ "env"
-                                           , "stack"
-                                           , "ghci"
-                                           , "--with-ghc"
-                                           , ghcExecutable
-                                           , "--ghci-options"
-                                           , "-e ':frontend HaduiGHCi'"
-                                           , "--ghci-options"
-                                           , "-ffrontend-opt " ++ show wsfd
-                                           ]
-                                        ++ extraOpts -- opts from hadui.yaml
-                                        )
-                                    )
-                { std_in  = NoStream
-                , std_out = Inherit
-                , std_err = Inherit
-                }
+                pid  <- forkProcess $ do
 
-            logDebug $ "hadui ws handler started for fd " <> display
-                (tshow wsfd)
+                    trace "forked in subprocess" $ pure ()
+                    -- -- TODO close all fds>2 except wsfd
+                    -- for_ [3..256] \fd -> 
+                    --     unless (fd == wsfd) $ catch (closeFd $ Fd fd) \(e::SomeException)->
+                    --         trace ( utf8BuilderToText $ "** failed close fd="<> (display $ tshow fd)) $ pure ()
+                    trace "exec.. in subprocess" $ pure ()
+
+                    executeFile
+                        "/usr/bin/env"
+                        False
+                        (  [ "stack"
+                           , "ghci"
+                           , "--with-ghc"
+                           , ghcExecutable
+                           , "--ghci-options"
+                           , "-e \":frontend HaduiGHCi\" -ffrontend-opt "
+                               ++ show wsfd
+                           ]
+                        ++ extraOpts -- opts from hadui.yaml
+                        )
+
+                        Nothing
+
+                runRIO app
+                    $  logDebug
+                    $  display
+                    $  "hadui started ws handler pid: "
+                    <> tshow pid
+
+                void $ forkIO $ do
+                    ps <- getProcessStatus True True pid
+                    void $ runRIO app $ case ps of
+                        Nothing -> return ()
+                        Just (Exited ExitSuccess) ->
+                            logDebug
+                                $  display
+                                $  "hadui ws handler process "
+                                <> tshow pid
+                                <> " exited."
+                        Just (Exited exitCode) ->
+                            logError
+                                $  display
+                                $  "hadui ws handler process "
+                                <> tshow pid
+                                <> " exited with "
+                                <> tshow exitCode
+                        Just (Terminated sig coreDumped) ->
+                            logWarn
+                                $  display
+                                $  "hadui ws handler process "
+                                <> tshow pid
+                                <> " killed by signal "
+                                <> tshow sig
+                        Just (Stopped sig) ->
+                            logWarn
+                                $  display
+                                $  "hadui ws handler process "
+                                <> tshow pid
+                                <> " stopped by signal "
+                                <> tshow sig
 
     -- always close fd of the ws socket in parent process
     forever $ bracket acceptWSC closeHandle spawnHandler

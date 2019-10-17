@@ -21,10 +21,15 @@ description: Please see the README on Github at <https://github.com/complyue/had
 dependencies:
   - ghc >= 8.6
   - unix
+  - process
 
   - base
   - rio
+  - text
   - directory
+  - aeson
+  - aeson-qq
+  - neat-interpolation
   - yaml
   - unliftio
   - network

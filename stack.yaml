@@ -3,8 +3,11 @@ resolver: lts-14.9
 packages:
   - hadui
 
+  - network
+  - websockets
+
 extra-deps:
   # need this line until network-3.x goes into lts
-  - network-3.1.1.0
+#   - network-3.1.1.0
 
 compiler-check: newer-minor

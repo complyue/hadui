@@ -11,7 +11,6 @@ where
 
 import           RIO
 import           RIO.FilePath
-import           RIO.Process
 import qualified System.Directory              as D
 
 import           HaduiRT
@@ -30,12 +29,10 @@ main = do
         _    -> error "hadui web resource directory missing ?!"
 
     lo <- backendLogOptions cfg
-    pc <- mkDefaultProcessContext
     withLogFunc lo $ \lf ->
         let haduiApp = HaduiFirstProcess { stackProjectRoot  = stackPrjRoot
                                          , haduiResourceRoot = haduiResRoot
                                          , haduiConfig       = cfg
                                          , appLogFunc        = lf
-                                         , appProcessContext = pc
                                          }
         in  runRIO haduiApp runHadUI
