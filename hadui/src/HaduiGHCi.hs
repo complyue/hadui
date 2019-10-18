@@ -97,14 +97,13 @@ mustUIO m = do
     pure ()
 
 
-uioLogAction :: UserInterfaceOutput -> LogAction
-uioLogAction uio dflags reason severity srcSpan style msg = do
+uioLogCompilerOutput :: UserInterfaceOutput -> LogAction
+uioLogCompilerOutput uio dflags reason severity srcSpan style msg = do
+    -- TODO print to web front UI log
+    runUIO uio $ logWarn " ** logging compiler output to web UI is to be impl"
+
     -- TODO only print to backend in debug level
     defaultLogAction dflags reason severity srcSpan style msg
-
-    -- TODO print to web front UI log
-
-    return ()
 
 interactiveUI :: UserInterfaceOutput -> Ghc ()
 interactiveUI uio = do
@@ -112,21 +111,21 @@ interactiveUI uio = do
     hsc_env <- getSession
 
     -- log to web UI
-    setLogAction $ uioLogAction uio
+    setLogAction $ uioLogCompilerOutput uio
 
     -- make sure 'mustUIO' is in scope
     _ <- runDeclsWithLocation "<hadui-ghci-init>" 1 "import HaduiGHCi(mustUIO)"
 
     runUIO uio
         $  uiLog
-        $  "hadui ready for project "
-        <> (tshow $ haduiProjectRoot uio)
+        $  "hadui ready for project: "
+        <> (pack $ haduiProjectRoot uio)
 
     -- TODO more semanticly diversified interpretions
     let !wsc = haduiWebSocket uio
         uioExecStmt :: Text -> Ghc ()
         uioExecStmt stmt = do
-        -- TODO lineNo should start at -1 to match UI input, how ?
+-- TODO lineNo should start at -1 to match UI input, how ?
             fhv <- compileExprRemote ("mustUIO $\n" ++ (unpack stmt))
             liftIO $ evalIO hsc_env fhv
 

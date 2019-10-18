@@ -4,14 +4,12 @@
 
 import { uiLog, clearLog } from "/log.js";
 
-import { HaduiWSC } from "./hadui-custom.js";
+import { HaduiDefaultStmt, HaduiWSC } from "./hadui-custom.js";
 
 export const haduiWSC = new HaduiWSC();
 
 export const mainEditor = CodeMirror(document.getElementById("main_code"), {
-  value: `-- interactive Haskell statement here --
-print "Hello - web front!"
-`,
+  value: HaduiDefaultStmt,
   lineNumbers: true,
   mode: "haskell",
   keyMap: "sublime",

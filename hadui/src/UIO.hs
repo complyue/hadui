@@ -16,9 +16,15 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module UIO
-    ( UIO(..)
+    ( module RIO -- use RIO as prelude
+
+    -- hadui stuff
+    , UIO(..)
     , UserInterfaceOutput(..)
     , runUIO
+
+    -- log functions
+    , print
     , uiLog
     )
 where
@@ -53,7 +59,8 @@ instance HasLogFunc UserInterfaceOutput where
 runUIO :: MonadIO m => UserInterfaceOutput -> UIO a -> m a
 runUIO uio (UIO (ReaderT f)) = liftIO (f uio)
 
-
+print :: Text -> UIO ()
+print = uiLog
 
 uiLog :: Text -> UIO ()
 uiLog msg = do
@@ -68,5 +75,4 @@ uiLog msg = do
             )
             Nothing
 
-
--- TODO define functions including 'uiLog' etc., through websocket.
+-- TODO more uiXXX functions

@@ -154,14 +154,23 @@ runHadUI = do
             sock <- socket (addrFamily addr)
                            (addrSocketType addr)
                            (addrProtocol addr)
-            setSocketOption sock ReuseAddr 0
+
+            -- TODO on Ubuntu 18.04, it may fail even port
+            --      not really in use without reuse addr,
+            -- it'll create confusion when another process
+            -- is accepting the ws request, we'd prefer not
+            -- to proceed if we can not exclusively listen
+            -- the port.
+            setSocketOption sock ReuseAddr 1
+
             withFdSocket sock setCloseOnExecIfNeeded
             bind sock $ addrAddress addr
             listen sock 20
             return sock
         wsFailure :: SomeException -> RIO HaduiFirstProcess ()
-        wsFailure exc =
-            logError $ "hadui failed with ws: " <> display (tshow exc)
+        wsFailure exc = do
+            logError $ "hadui failed with ws serving: " <> display (tshow exc)
+            liftIO $ exitImmediately $ ExitFailure 1
 
     -- serve websockets in background threads
     for_ addrs $ \addr -> do
@@ -244,6 +253,17 @@ upstartHandler sock = do
                      , "ghci"
                      , "--with-ghc"
                      , ghcExecutable
+
+                     -- use UIO which reexports RIO as prelude
+                     , "--ghc-options"
+                     , "-XNoImplicitPrelude"
+
+                     -- really hope that Haskell the language unify the string
+                     -- types (with utf8 seems the norm) sooner than later
+                     , "--ghc-options"
+                     , "-XOverloadedStrings"
+
+                     -- the frontend trigger
                      , "--ghci-options"
                      , "-e \":frontend HaduiGHCi\" -ffrontend-opt " ++ show wsfd
                      ]
