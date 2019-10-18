@@ -27,13 +27,7 @@ $("button[name=crunch]").on("click", async function() {
   let ws = await haduiWSC.dial();
   let mainCode = mainEditor.getValue();
   uiLog("Executing stmt:", "msg", mainCode);
-  ws.send(
-    // TODO make real rpc
-    JSON.stringify({
-      type: "msg",
-      msgText: mainEditor.getValue()
-    })
-  );
+  ws.send(mainEditor.getValue());
 });
 $("button[name=clear-log]").on("click", function() {
   clearLog();
