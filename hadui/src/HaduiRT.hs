@@ -27,19 +27,17 @@ import           RIO                     hiding ( unlines
                                                 , unwords
                                                 )
 import           RIO.Text
+import           RIO.FilePath
 
 import           System.Posix.Types
 import           System.Posix.Process
-import           System.Posix.IO                ( closeFd )
+import           System.Posix.IO
+import qualified System.Directory              as D
 
 import           UnliftIO.Concurrent
 import           UnliftIO.Process
-import           RIO.FilePath
-
-import qualified System.Directory              as D
 
 import           Data.Yaml.Aeson
-
 
 import           Network.Socket
 
@@ -59,10 +57,11 @@ loadConfig =
                         haduiYamlFile = stackPrjRoot </> "hadui.yaml"
                     in  D.doesFileExist haduiYamlFile
                             >>= \case
-                                    -- *** XXX this always segfault in ws subprocess
-                                    -- True -> decodeFileThrow haduiYamlFile
+                                    -- TODO this segfaults on OSX in ws subprocess,
+                                    --      to figure out the situation.
+                                    True -> decodeFileThrow haduiYamlFile
                                     -- parse empty dict for all defaults
-                                    _ -> decodeThrow "{}"
+                                    _    -> decodeThrow "{}"
                             >>= \cfg -> return (stackPrjRoot, cfg)
                 _ -> error "Can not determine stack project root."
 
@@ -91,7 +90,7 @@ instance FromJSON HaduiConfig where
             .!= 5051
             <*> v
             .:? "log-level"
-            .!= "DEBUG"
+            .!= "INFO"
             <*> v
             .:? "with-ghc"
             .!= "ghc-ife" -- TODO default to ghc once ':frontend' cmd is supported officially
@@ -183,19 +182,10 @@ runHadUI = do
             Left  exc -> error $ "hadui unexpected encoding error: " ++ show exc
             Right msg -> runRIO app $ logError $ display msg
         httpListening httpInfo = runRIO app $ do
-            logInfo
-                $  display
-                $  "hadui available at: http://"
-                <> bindInterface cfg
-                <> ":"
-                <> tshow (httpPort cfg)
-            -- TODO local network package built into hadui is incompatible with
-            --      that built into snap-server package, the network package matters.
-            -- listenAddrs <- liftIO
-            --     $ sequence (getSocketName <$> getStartupSockets httpInfo)
-            -- logInfo $ "hadui available at: " <> (display . unwords)
-            --     (("http://" <>) . tshow <$> listenAddrs)
-            pure ()
+            listenAddrs <- liftIO
+                $ sequence (getSocketName <$> getStartupSockets httpInfo)
+            logInfo $ "hadui available at: " <> (display . unwords)
+                (("http://" <>) . tshow <$> listenAddrs)
 
         dirServCfg   = fancyDirectoryConfig
         prjResRoot   = stackProjectRoot app </> "hadui"
@@ -234,7 +224,7 @@ upstartHandler sock = do
             )
 
         acceptWSC = liftIO $ accept sock
-        closeHandle (conn, wsPeerAddr) = liftIO $ do
+        closeHandle (conn, _) = liftIO $ do
             wsfd <- unsafeFdSocket conn
             closeFd $ Fd wsfd
 
@@ -243,30 +233,23 @@ upstartHandler sock = do
             liftIO $ do
                 wsfd <- unsafeFdSocket conn
 
-                pid  <- forkProcess $ do
+                -- clear FD_CLOEXEC flag so it can be passed to subprocess
+                setFdOption (Fd wsfd) CloseOnExec False
 
-                    trace "forked in subprocess" $ pure ()
-                    -- -- TODO close all fds>2 except wsfd
-                    -- for_ [3..256] \fd -> 
-                    --     unless (fd == wsfd) $ catch (closeFd $ Fd fd) \(e::SomeException)->
-                    --         trace ( utf8BuilderToText $ "** failed close fd="<> (display $ tshow fd)) $ pure ()
-                    trace "exec.. in subprocess" $ pure ()
-
-                    executeFile
-                        "/usr/bin/env"
-                        False
-                        (  [ "stack"
-                           , "ghci"
-                           , "--with-ghc"
-                           , ghcExecutable
-                           , "--ghci-options"
-                           , "-e \":frontend HaduiGHCi\" -ffrontend-opt "
-                               ++ show wsfd
-                           ]
-                        ++ extraOpts -- opts from hadui.yaml
-                        )
-
-                        Nothing
+                -- launch `stack ghci` with hadui's GHC frontend to serve the ws
+                pid <- forkProcess $ executeFile
+                    "/usr/bin/env"
+                    False
+                    ([ "stack"
+                     , "ghci"
+                     , "--with-ghc"
+                     , ghcExecutable
+                     , "--ghci-options"
+                     , "-e \":frontend HaduiGHCi\" -ffrontend-opt " ++ show wsfd
+                     ]
+                    ++ extraOpts -- opts from hadui.yaml
+                    )
+                    Nothing
 
                 runRIO app
                     $  logDebug
@@ -274,10 +257,12 @@ upstartHandler sock = do
                     $  "hadui started ws handler pid: "
                     <> tshow pid
 
+                -- say sth on exit of the subprocess, this also prevents
+                -- the exited subprocess becoming a zombie.
                 void $ forkIO $ do
                     ps <- getProcessStatus True True pid
                     void $ runRIO app $ case ps of
-                        Nothing -> return ()
+                        Nothing -> error "the impossible happens here"
                         Just (Exited ExitSuccess) ->
                             logDebug
                                 $  display
@@ -298,6 +283,9 @@ upstartHandler sock = do
                                 <> tshow pid
                                 <> " killed by signal "
                                 <> tshow sig
+                                <> if coreDumped
+                                       then " with core dumped"
+                                       else ""
                         Just (Stopped sig) ->
                             logWarn
                                 $  display

@@ -22,6 +22,7 @@ dependencies:
   - ghc >= 8.6
   - unix
   - process
+  - network >= 3.0
 
   - base
   - rio
@@ -32,11 +33,9 @@ dependencies:
   - neat-interpolation
   - yaml
   - unliftio
-  - network
   - websockets
   - snap-core
   - snap-server
-  - containers
 
 ghc-options:
   - -Wall
