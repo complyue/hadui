@@ -18,14 +18,16 @@
 module UIO
     ( module RIO -- use RIO as prelude
 
-    -- hadui stuff
+    -- monad stuff
     , UIO(..)
     , UserInterfaceOutput(..)
     , runUIO
 
     -- log functions
     , print
+    , MsgToUI(..)
     , uiLog
+    , uiClearLog
     )
 where
 
@@ -59,20 +61,70 @@ instance HasLogFunc UserInterfaceOutput where
 runUIO :: MonadIO m => UserInterfaceOutput -> UIO a -> m a
 runUIO uio (UIO (ReaderT f)) = liftIO (f uio)
 
-print :: Text -> UIO ()
-print = uiLog
+print :: Display a => a -> UIO ()
+print v = uiLog $ TextMsg $ textDisplay v
 
-uiLog :: Text -> UIO ()
+
+data MsgToUI = TextMsg Text
+    | DetailedMsg Text TheDetails
+    | ErrorMsg Text
+    | DetailedErrorMsg Text TheDetails
+    | HtmlMsg Text
+type TheDetails = Text
+
+uiLog :: MsgToUI -> UIO ()
 uiLog msg = do
     uio <- ask
-    liftIO $ withMVar
-        (haduiCommMutex uio)
-        \() -> WS.sendDataMessage (haduiWebSocket uio) $ WS.Text
+    liftIO $ withMVar (haduiCommMutex uio) $ \() -> case msg of
+        TextMsg msgText -> WS.sendDataMessage (haduiWebSocket uio) $ WS.Text
             (A.encode [aesonQQ|{
 "type": "msg"
-, "msgText": #{msg}
+, "msgText": #{msgText}
 }|]
             )
             Nothing
+        DetailedMsg msgText msgDetails ->
+            WS.sendDataMessage (haduiWebSocket uio) $ WS.Text
+                (A.encode [aesonQQ|{
+"type": "msg"
+, "msgText": #{msgText}
+, "msgDetails": #{msgDetails}
+}|]
+                )
+                Nothing
+        ErrorMsg errText -> WS.sendDataMessage (haduiWebSocket uio) $ WS.Text
+            (A.encode [aesonQQ|{
+"type": "msg"
+, "msgText": #{errText}
+, "msgType": "err-msg"
+}|]
+            )
+            Nothing
+        DetailedErrorMsg errText errDetails ->
+            WS.sendDataMessage (haduiWebSocket uio) $ WS.Text
+                (A.encode [aesonQQ|{
+"type": "msg"
+, "msgText": #{errText}
+, "msgType": "err-msg"
+, "msgDetails": #{errDetails}
+}|]
+                )
+                Nothing
+
+        -- more TBD
+        _ -> pure ()
+
+
+uiClearLog :: UIO ()
+uiClearLog = do
+    uio <- ask
+    liftIO $ withMVar (haduiCommMutex uio) $ \() ->
+        WS.sendDataMessage (haduiWebSocket uio) $ WS.Text
+            (A.encode [aesonQQ|{
+"type": "clear"
+}|]
+            )
+            Nothing
+
 
 -- TODO more uiXXX functions

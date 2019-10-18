@@ -116,16 +116,20 @@ interactiveUI uio = do
     -- make sure 'mustUIO' is in scope
     _ <- runDeclsWithLocation "<hadui-ghci-init>" 1 "import HaduiGHCi(mustUIO)"
 
+    -- to allow literal Text/Int without explicit type anno
+    _ <- runDeclsWithLocation "<hadui-ghci-init>" 1 "default (Text, Int)"
+
     runUIO uio
         $  uiLog
-        $  "hadui ready for project: "
+        $  DetailedMsg "hadui ready for project at: "
+        $  "  · "
         <> (pack $ haduiProjectRoot uio)
 
-    -- TODO more semanticly diversified interpretions
+    -- todo more semanticly diversified interpretions ?
     let !wsc = haduiWebSocket uio
         uioExecStmt :: Text -> Ghc ()
         uioExecStmt stmt = do
--- TODO lineNo should start at -1 to match UI input, how ?
+-- TODO lineNo should start at -1 to match UI input, how to do that ?
             fhv <- compileExprRemote ("mustUIO $\n" ++ (unpack stmt))
             liftIO $ evalIO hsc_env fhv
 

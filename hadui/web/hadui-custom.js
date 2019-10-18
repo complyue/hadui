@@ -10,7 +10,7 @@ export const HaduiDefaultStmt =
 -- interactive Haskell statement here --
 {- you have the same artifacts as with \`stack ghci\` in scope
 you \`import UIO (print)\` somewhere in your project,
-or more preferably \`import UIO\` to get \`print\` -}
+or more preferably \`import UIO\`, to get \`print\` -}
 print "Hello - web front!"
 `.trim();
 

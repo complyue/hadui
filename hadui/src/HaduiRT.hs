@@ -263,6 +263,10 @@ upstartHandler sock = do
                      , "--ghc-options"
                      , "-XOverloadedStrings"
 
+                     -- to allow literal Text/Int without explicit type anno
+                     , "--ghc-options"
+                     , "-XExtendedDefaultRules"
+
                      -- the frontend trigger
                      , "--ghci-options"
                      , "-e \":frontend HaduiGHCi\" -ffrontend-opt " ++ show wsfd
