@@ -41,7 +41,7 @@ import qualified Network.WebSockets            as WS
 import qualified Data.Aeson                    as A
 import           Data.Aeson.QQ
 
-import           HadUI
+import           UIO
 import           HaduiRT
 
 
@@ -124,15 +124,16 @@ interactiveUI uio = do
 
     -- TODO more semanticly diversified interpretions
     let !wsc = haduiWebSocket uio
-        execStmt :: Text -> Ghc ()
-        execStmt stmt = do
+        uioExecStmt :: Text -> Ghc ()
+        uioExecStmt stmt = do
+        -- TODO lineNo should start at -1 to match UI input, how ?
             fhv <- compileExprRemote ("mustUIO $\n" ++ (unpack stmt))
             liftIO $ evalIO hsc_env fhv
 
         interpretTextPacket :: TL.Text -> Ghc ()
         interpretTextPacket pkt = do
             let stmt = TL.toStrict pkt
-            gcatch (execStmt stmt) $ \(exc :: GhcException) -> do
+            gcatch (uioExecStmt stmt) $ \(exc :: GhcException) -> do
                 let errDetails = tshow exc
                 runUIO uio
                     $  logError
@@ -154,8 +155,8 @@ interactiveUI uio = do
         servWS = do
             pkt <- liftIO $ WS.receiveDataMessage wsc
             case pkt of
-                (WS.Text bytes (Just pktText)) -> interpretTextPacket pktText
-                (WS.Binary bytes             ) -> do
+                (WS.Text _bytes (Just pktText)) -> interpretTextPacket pktText
+                (WS.Binary _bytes             ) -> do
                     runUIO uio
                         $ logError
                         $ "hadui received binary packet from ws ?!"

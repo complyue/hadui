@@ -15,7 +15,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 
-module HadUI
+module UIO
     ( UIO(..)
     , UserInterfaceOutput(..)
     , runUIO
