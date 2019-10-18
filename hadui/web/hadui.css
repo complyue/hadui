@@ -19,7 +19,7 @@ body {
   border: 1px solid silver;
   background-color: #30312a;
   width: 96%;
-  height: 120pt;
+  height: 150pt;
   min-height: 12pt;
 }
 
@@ -46,6 +46,10 @@ body {
   margin: 1px 1px;
   padding: 0;
   line-height: 1;
+}
+
+.LogBox pre {
+  margin-left: 12pt;
 }
 
 .LogBox .ts {

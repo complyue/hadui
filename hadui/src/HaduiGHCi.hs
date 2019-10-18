@@ -119,11 +119,8 @@ interactiveUI uio = do
     -- to allow literal Text/Int without explicit type anno
     _ <- runDeclsWithLocation "<hadui-ghci-init>" 1 "default (Text, Int)"
 
-    runUIO uio
-        $  uiLog
-        $  DetailedMsg "hadui ready for project at: "
-        $  "  · "
-        <> (pack $ haduiProjectRoot uio)
+    runUIO uio $ uiLog $ DetailedMsg "hadui ready for project at: "
+                                     (pack $ haduiProjectRoot uio)
 
     -- todo more semanticly diversified interpretions ?
     let !wsc = haduiWebSocket uio
