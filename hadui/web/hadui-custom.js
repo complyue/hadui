@@ -7,11 +7,11 @@ import WSC from "/wsc.js";
 export const HaduiDefaultStmt =
   // the statement shown initially
   `
--- interactive Haskell statement here --
-{- you have the same artifacts as with \`stack ghci\` in scope
-you \`import UIO (print)\` somewhere in your project,
-or more preferably \`import UIO\`, to get \`print\` -}
-print "Hello - web front!"
+{- put and execute interactive Haskell statement here.
+you have the same artifacts in scope as \`stack ghci\`.
+to get \`print\` work here, you re-export \`UIO (print)\`
+from some module in your project. -}
+print "Hello, web front!"
 `.trim();
 
 export class HaduiWSC extends WSC {
