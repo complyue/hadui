@@ -130,17 +130,20 @@ interactiveUI uio = do
     let !wsc = haduiWebSocket uio
         uioExecStmt :: Text -> GHC.Ghc ()
         uioExecStmt stmt = do
--- TODO lineNo should start at -1 to match UI input, how to do that ?
-            fhv     <- GHC.compileExprRemote $ "mustUIO $\n" ++ T.unpack stmt
-            hsc_env <- GHC.getSession
-            liftIO $ GHCi.evalIO hsc_env fhv
+            _execResult <- GHC.execStmt
+                ("mustUIO $\n" ++ T.unpack stmt)
+                GHC.execOptions { GHC.execSourceFile = "<hadui-adhoc>"
+                                , GHC.execLineNumber = 0
+                                }
+            -- TODO say sth about the result to web UI ?
+            return ()
 
         interpretTextPacket :: TL.Text -> GHC.Ghc ()
         interpretTextPacket pkt = do
             let stmt = TL.toStrict pkt
                 logGhcExc exc = do
                     let errDetails = tshow exc
-                    runUIO uio $ uiLog $ DetailedErrorMsg "GHC got error: "
+                    runUIO uio $ uiLog $ DetailedErrorMsg "GHC error: "
                                                           errDetails
                 logSrcError err = do
                     dynFlags <- GHC.getSessionDynFlags
@@ -148,7 +151,7 @@ interactiveUI uio = do
                             (GHC.showSDoc dynFlags)
                             (GHC.pprErrMsgBagWithLoc $ GHC.srcErrorMessages err)
                     runUIO uio $ uiLog $ DetailedErrorMsg
-                        "Statement has error: "
+                        "The stmt has error: "
                         errDetails
             GHC.handleGhcException logGhcExc
                 $ GHC.handleSourceError logSrcError
