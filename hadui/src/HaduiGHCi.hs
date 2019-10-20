@@ -34,7 +34,6 @@ import qualified ErrUtils                      as GHC
 import qualified Panic                         as GHC
 import qualified GhcMonad                      as GHC
 import qualified GhcPlugins                    as GHC
-import qualified GHCi                          as GHCi
 
 import           Network.Socket                 ( mkSocket )
 import qualified Network.WebSockets            as WS
