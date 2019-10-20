@@ -20,7 +20,7 @@ import qualified Paths_hadui                   as Meta
 
 main :: IO ()
 main = do
-    (stackPrjRoot, cfg) <- loadConfig
+    (stackPrjRoot, cfg) <- loadHaduiConfig
 
     dataDir             <- Meta.getDataDir
     let haduiResRoot = dataDir </> "web"
@@ -28,11 +28,11 @@ main = do
         True -> return ()
         _    -> error "hadui web resource directory missing ?!"
 
-    lo <- backendLogOptions cfg
+    lo <- haduiBackendLogOpts cfg
     withLogFunc lo $ \lf ->
         let haduiApp = HaduiFirstProcess { stackProjectRoot  = stackPrjRoot
                                          , haduiResourceRoot = haduiResRoot
                                          , haduiConfig       = cfg
                                          , appLogFunc        = lf
                                          }
-        in  runRIO haduiApp runHadUI
+        in  runRIO haduiApp runHadui

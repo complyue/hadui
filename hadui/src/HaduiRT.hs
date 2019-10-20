@@ -4,6 +4,7 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -15,19 +16,24 @@
 
 -- | hadui runtime
 module HaduiRT
-    ( HaduiConfig(..)
-    , loadConfig
-    , backendLogOptions
+    ( UIO(..)
+    , UserInterfaceOutput(..)
+    , runUIO
+    , mustUIO
+    , initUIO
+    , HaduiConfig(..)
+    , loadHaduiConfig
+    , haduiBackendLogOpts
     , HaduiFirstProcess(..)
-    , runHadUI
+    , runHadui
     )
 where
 
-import           RIO                     hiding ( unlines
-                                                , unwords
-                                                )
-import           RIO.Text
+import           RIO
+import qualified RIO.Text                      as T
 import           RIO.FilePath
+
+import           System.IO.Unsafe
 
 import           System.Posix.Types
 import           System.Posix.Process
@@ -40,20 +46,90 @@ import           UnliftIO.Process
 import           Data.Yaml.Aeson
 
 import           Network.Socket
+import qualified Network.WebSockets            as WS
 
 import           Snap.Core               hiding ( logError )
 import           Snap.Http.Server
 import           Snap.Util.FileServe
 
 
-loadConfig :: IO (FilePath, HaduiConfig)
-loadConfig =
+-- | The monad for User Interface Output
+-- UIO is output only, conversely to IO (which stands for Input/Output),
+-- user inputs shall be facilitated with a registry of 'MVar's,
+-- those get filled with 'IoC' from UI widgets.
+newtype UIO a = UIO { unUIO :: ReaderT UserInterfaceOutput IO a }
+    deriving (Functor, Applicative, Monad, MonadIO,
+        MonadReader UserInterfaceOutput, MonadThrow)
+
+data UserInterfaceOutput = UserInterfaceOutput {
+    haduiProjectRoot :: FilePath
+    , haduiCommMutex :: MVar ()
+    , haduiWebSocket :: WS.Connection
+
+    , backendLogFunc :: !LogFunc
+    }
+
+instance HasLogFunc UserInterfaceOutput where
+    logFuncL = lens backendLogFunc (\x y -> x { backendLogFunc = y })
+
+runUIO :: MonadIO m => UserInterfaceOutput -> UIO a -> m a
+runUIO uio (UIO (ReaderT f)) = liftIO (f uio)
+
+
+initUIO :: Int -> IO UserInterfaceOutput
+initUIO wsfd = do
+    uninitialized <- isEmptyMVar _globalUIO
+    unless uninitialized $ error "initUIO reentrance ?!"
+
+    (stackPrjRoot, cfg) <- loadHaduiConfig
+    lo                  <- haduiBackendLogOpts cfg
+    -- todo teardown 'lf' once the log target needs,
+    -- not needed as we only log to stderr by far
+    (lf, _ :: IO ())    <- newLogFunc lo
+    mu                  <- newMVar ()
+    wsc                 <- websocketFromFD wsfd
+    let uio = UserInterfaceOutput { haduiProjectRoot = stackPrjRoot
+                                  , haduiCommMutex   = mu
+                                  , haduiWebSocket   = wsc
+                                  , backendLogFunc   = lf
+                                  }
+    putMVar _globalUIO uio
+    runUIO uio
+        $  logInfo
+        $  "hadui interactive frontend serving wsfd="
+        <> (display $ tshow wsfd)
+    return uio
+
+_globalUIO :: MVar UserInterfaceOutput
+{-# NOINLINE _globalUIO #-}
+_globalUIO = unsafePerformIO newEmptyMVar
+
+-- | every statement will be lifted by this function into IO monad for GHCi to execute.
+-- this also very explicitly hints the expected monad type for all statements to eval.
+mustUIO :: NFData a => UIO a -> IO ()
+mustUIO m = do
+    uio <- readMVar _globalUIO
+    v   <- runUIO uio m
+    _   <- pure $!! v -- force it to be executed
+    pure ()
+
+websocketFromFD :: Int -> IO WS.Connection
+websocketFromFD fd = do
+    sock  <- mkSocket (fromIntegral fd)
+    pconn <- WS.makePendingConnection sock
+        $ WS.defaultConnectionOptions { WS.connectionStrictUnicode = True }
+    WS.acceptRequest pconn
+
+
+
+loadHaduiConfig :: IO (FilePath, HaduiConfig)
+loadHaduiConfig =
     readProcessWithExitCode "/usr/bin/env"
                             ["stack", "path", "--project-root"]
                             ""
         >>= \case
                 (ExitSuccess, outBytes, "") ->
-                    let stackPrjRoot  = (unpack . strip . pack) outBytes
+                    let stackPrjRoot  = (T.unpack . T.strip . T.pack) outBytes
                         haduiYamlFile = stackPrjRoot </> "hadui.yaml"
                     in  D.doesFileExist haduiYamlFile
                             >>= \case
@@ -103,8 +179,8 @@ instance FromJSON HaduiConfig where
     parseJSON _ = fail "Expected Object for Config value"
 
 
-backendLogOptions :: HaduiConfig -> IO LogOptions
-backendLogOptions cfg = do
+haduiBackendLogOpts :: HaduiConfig -> IO LogOptions
+haduiBackendLogOpts cfg = do
     let ll = case logLevel cfg of
             "DEBUG" -> LevelDebug
             "WARN"  -> LevelWarn
@@ -126,8 +202,8 @@ instance HasLogFunc HaduiFirstProcess where
     logFuncL = lens appLogFunc (\x y -> x { appLogFunc = y })
 
 
-runHadUI :: RIO HaduiFirstProcess ()
-runHadUI = do
+runHadui :: RIO HaduiFirstProcess ()
+runHadui = do
     app <- ask
     let cfg = haduiConfig app
 
@@ -141,14 +217,14 @@ runHadUI = do
         <> "]"
     logDebug $ "hadui with-ghc: \n  " <> display (withGHC cfg)
     logDebug $ "hadui ghci-options: \n" <> display
-        (unlines $ ("  " <>) <$> ghciOptions cfg)
+        (T.unlines $ ("  " <>) <$> ghciOptions cfg)
     logDebug $ "hadui ghc-options: \n" <> display
-        (unlines $ ("  " <>) <$> ghcOptions cfg)
+        (T.unlines $ ("  " <>) <$> ghcOptions cfg)
 
 
     addrs <- liftIO $ getAddrInfo
         (Just $ defaultHints { addrSocketType = Stream })
-        (Just $ unpack $ bindInterface cfg)
+        (Just $ T.unpack $ bindInterface cfg)
         (Just $ show $ wsPort cfg)
     let listenWS addr = do
             sock <- socket (addrFamily addr)
@@ -193,7 +269,7 @@ runHadUI = do
         httpListening httpInfo = runRIO app $ do
             listenAddrs <- liftIO
                 $ sequence (getSocketName <$> getStartupSockets httpInfo)
-            logInfo $ "hadui available at: " <> (display . unwords)
+            logInfo $ "hadui available at: " <> (display . T.unwords)
                 (("http://" <>) . tshow <$> listenAddrs)
 
         dirServCfg   = fancyDirectoryConfig
@@ -226,7 +302,7 @@ upstartHandler sock = do
     logInfo $ "hadui listening ws://" <> display (tshow addr)
 
     let cfg            = haduiConfig app
-        !ghcExecutable = unpack $ withGHC cfg
+        !ghcExecutable = T.unpack $ withGHC cfg
         !extraOpts     = RIO.concat
             (  [ ["--ghci-options", show opt] | opt <- ghciOptions cfg ]
             ++ [ ["--ghc-options", show opt] | opt <- ghcOptions cfg ]

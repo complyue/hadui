@@ -16,12 +16,13 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module UIO
-    ( module RIO -- use RIO as prelude
+    ( module RIO -- re-export RIO, so UIO can be used as prelude too
 
     -- monad stuff
     , UIO(..)
     , UserInterfaceOutput(..)
     , runUIO
+    , mustUIO
 
     -- log functions
     , print
@@ -31,6 +32,7 @@ module UIO
     )
 where
 
+    
 import           RIO
 
 import qualified Network.WebSockets            as WS
@@ -38,28 +40,8 @@ import qualified Network.WebSockets            as WS
 import qualified Data.Aeson                    as A
 import           Data.Aeson.QQ                  ( aesonQQ )
 
+import           HaduiRT
 
--- | The monad for User Interface Output
--- UIO is output only, conversely to IO (which stands for Input/Output),
--- user inputs shall be facilitated with a registry of 'MVar's,
--- those get filled with 'IoC' from UI widgets.
-newtype UIO a = UIO { unUIO :: ReaderT UserInterfaceOutput IO a }
-    deriving (Functor, Applicative, Monad, MonadIO,
-        MonadReader UserInterfaceOutput, MonadThrow)
-
-data UserInterfaceOutput = UserInterfaceOutput {
-    haduiProjectRoot :: FilePath
-    , haduiCommMutex :: MVar ()
-    , haduiWebSocket :: WS.Connection
-
-    , backendLogFunc :: !LogFunc
-    }
-
-instance HasLogFunc UserInterfaceOutput where
-    logFuncL = lens backendLogFunc (\x y -> x { backendLogFunc = y })
-
-runUIO :: MonadIO m => UserInterfaceOutput -> UIO a -> m a
-runUIO uio (UIO (ReaderT f)) = liftIO (f uio)
 
 print :: Display a => a -> UIO ()
 print v = uiLog $ TextMsg $ textDisplay v
