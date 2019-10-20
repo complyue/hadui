@@ -36,7 +36,7 @@ import           RIO
 import qualified Network.WebSockets            as WS
 
 import qualified Data.Aeson                    as A
-import           Data.Aeson.QQ
+import           Data.Aeson.QQ                  ( aesonQQ )
 
 
 -- | The monad for User Interface Output

@@ -22,41 +22,42 @@ module HaduiGHCi
 where
 
 import           RIO
-import           RIO.Text
+import qualified RIO.Text                      as T
 import qualified RIO.Text.Lazy                 as TL
 import qualified Data.Text.Lazy.Encoding       as TLE
 
 import           System.IO.Unsafe
 
-import           GHC                           as GHC
-import           GHCi                          as GHCi
-import           Panic                   hiding ( trace )
-import           GhcPlugins              hiding ( trace
-                                                , (<>)
-                                                )
+import qualified GHC                           as GHC
+import qualified HscTypes                      as GHC
+import qualified ErrUtils                      as GHC
+import qualified Panic                         as GHC
+import qualified GhcMonad                      as GHC
+import qualified GhcPlugins                    as GHC
+import qualified GHCi                          as GHCi
 
 import           Network.Socket                 ( mkSocket )
 import qualified Network.WebSockets            as WS
-
-import qualified Data.Aeson                    as A
-import           Data.Aeson.QQ
 
 import           UIO
 import           HaduiRT
 
 
-frontendPlugin :: FrontendPlugin
-frontendPlugin = defaultFrontendPlugin { frontend = gfeMain }  where
+frontendPlugin :: GHC.FrontendPlugin
+frontendPlugin = GHC.defaultFrontendPlugin { GHC.frontend = gfeMain }  where
     -- GHC frontend plugin entry point
     gfeMain flags args = do
         case args of
             [] -> pure ()
-            _  -> throwGhcException $ CmdLineError "WebUI expects NO src file"
+            _  -> GHC.throwGhcException
+                $ GHC.CmdLineError "WebUI expects NO src file"
         case flags of
             [wsfdStr] -> case (readMaybe wsfdStr :: Maybe Int) of
-                Nothing   -> throwGhcException $ CmdLineError "Invalid wsfd"
+                Nothing ->
+                    GHC.throwGhcException $ GHC.CmdLineError "Invalid wsfd"
                 Just wsfd -> (liftIO $ initUIO wsfd) >>= interactiveUI
-            _ -> throwGhcException $ CmdLineError "WebUI expects single wsfd"
+            _ -> GHC.throwGhcException
+                $ GHC.CmdLineError "WebUI expects single wsfd"
 
     initUIO :: Int -> IO UserInterfaceOutput
     initUIO wsfd = do
@@ -97,79 +98,82 @@ mustUIO m = do
     pure ()
 
 
-uioLogCompilerOutput :: UserInterfaceOutput -> LogAction
+-- TODO this seems not invoked if we do handleSourceError, figure out if
+--      it's appropriate to not do setLogAction at all.
+uioLogCompilerOutput :: UserInterfaceOutput -> GHC.LogAction
 uioLogCompilerOutput uio dflags reason severity srcSpan style msg = do
-    -- TODO print to web front UI log
-    runUIO uio $ logWarn " ** logging compiler output to web UI is to be impl"
+    -- TODO print to web front UI log with colors,
+    --     and only print to backend in debug level.
+    runUIO uio $ logDebug " *** not directing GHC log to front UI yet."
+    GHC.defaultLogAction dflags reason severity srcSpan style msg
 
-    -- TODO only print to backend in debug level
-    defaultLogAction dflags reason severity srcSpan style msg
-
-interactiveUI :: UserInterfaceOutput -> Ghc ()
+interactiveUI :: UserInterfaceOutput -> GHC.Ghc ()
 interactiveUI uio = do
-    -- obtain compiler session
-    hsc_env <- getSession
+    -- obtain GHC session for the interaction course
+    ghcSession <- GHC.reifyGhc return
 
     -- log to web UI
-    setLogAction $ uioLogCompilerOutput uio
+    GHC.setLogAction $ uioLogCompilerOutput uio
 
     -- make sure 'mustUIO' is in scope
-    _ <- runDeclsWithLocation "<hadui-ghci-init>" 1 "import HaduiGHCi(mustUIO)"
+    _ <- GHC.runDeclsWithLocation "<hadui-ghci-init>"
+                                  1
+                                  "import HaduiGHCi(mustUIO)"
 
     -- to allow literal Text/Int without explicit type anno
-    _ <- runDeclsWithLocation "<hadui-ghci-init>" 1 "default (Text, Int)"
+    _ <- GHC.runDeclsWithLocation "<hadui-ghci-init>" 1 "default (Text, Int)"
 
     runUIO uio $ uiLog $ DetailedMsg "hadui ready for project at: "
-                                     (pack $ haduiProjectRoot uio)
+                                     (T.pack $ haduiProjectRoot uio)
 
     -- todo more semanticly diversified interpretions ?
     let !wsc = haduiWebSocket uio
-        uioExecStmt :: Text -> Ghc ()
+        uioExecStmt :: Text -> GHC.Ghc ()
         uioExecStmt stmt = do
 -- TODO lineNo should start at -1 to match UI input, how to do that ?
-            fhv <- compileExprRemote ("mustUIO $\n" ++ (unpack stmt))
-            liftIO $ evalIO hsc_env fhv
+            fhv     <- GHC.compileExprRemote $ "mustUIO $\n" ++ T.unpack stmt
+            hsc_env <- GHC.getSession
+            liftIO $ GHCi.evalIO hsc_env fhv
 
-        interpretTextPacket :: TL.Text -> Ghc ()
+        interpretTextPacket :: TL.Text -> GHC.Ghc ()
         interpretTextPacket pkt = do
             let stmt = TL.toStrict pkt
-            gcatch (uioExecStmt stmt) $ \(exc :: GhcException) -> do
-                let errDetails = tshow exc
-                runUIO uio
-                    $  logError
-                    $  "hadui stmt exec error: "
-                    <> (display errDetails)
-                liftIO $ withMVar
-                    (haduiCommMutex uio)
-                    \() -> WS.sendDataMessage wsc $ WS.Text
-                        (A.encode [aesonQQ|{
-"type": "err"
-, "errText": "unexpected error:"
-, "errDetails": #{errDetails}
-}|]
-                        )
-                        Nothing
+                logGhcExc exc = do
+                    let errDetails = tshow exc
+                    runUIO uio $ uiLog $ DetailedErrorMsg "GHC got error: "
+                                                          errDetails
+                logSrcError err = do
+                    dynFlags <- GHC.getSessionDynFlags
+                    let errDetails = T.pack $ unlines $ map
+                            (GHC.showSDoc dynFlags)
+                            (GHC.pprErrMsgBagWithLoc $ GHC.srcErrorMessages err)
+                    runUIO uio $ uiLog $ DetailedErrorMsg
+                        "Statement has error: "
+                        errDetails
+            GHC.handleGhcException logGhcExc
+                $ GHC.handleSourceError logSrcError
+                $ uioExecStmt stmt
 
     -- serving ws forever
-    let servWS :: Ghc ()
+    let servWS :: IO ()
         servWS = do
-            pkt <- liftIO $ WS.receiveDataMessage wsc
+            pkt <- WS.receiveDataMessage wsc
             case pkt of
-                (WS.Text _bytes (Just pktText)) -> interpretTextPacket pktText
-                (WS.Binary _bytes             ) -> do
+                (WS.Text _bytes (Just pktText)) ->
+                    GHC.reflectGhc (interpretTextPacket pktText) ghcSession
+                (WS.Binary _bytes) -> do
                     runUIO uio
-                        $ logError
-                        $ "hadui received binary packet from ws ?!"
-                    liftIO $ WS.sendCloseCode wsc 1003 ("?!?" :: Text)
+                        $ logError "hadui received binary packet from ws ?!"
+                    WS.sendCloseCode wsc 1003 ("?!?" :: Text)
                 _ -> do
                     runUIO uio $ logError
                         "hadui received unknown packet from ws ?!"
-                    liftIO $ WS.sendCloseCode wsc 1003 ("?!?" :: Text)
+                    WS.sendCloseCode wsc 1003 ("?!?" :: Text)
             -- anyway we should continue receiving, even after close request sent, 
             -- we are expected to process a CloseRequest ctrl message from peer.
             servWS
-    gcatch servWS $ \exc -> do
-        liftIO $ case exc of
+    liftIO $ catch servWS $ \exc -> do
+        case exc of
             WS.CloseRequest closeCode closeReason
                 | closeCode == 1000 || closeCode == 1001
                 -> runUIO uio $ logDebug "hadui ws closed normally."
@@ -185,7 +189,7 @@ interactiveUI uio = do
                 runUIO uio $ logDebug $ "hadui ws disconnected forcefully."
             _ -> do
                 runUIO uio $ logError "hadui unexpected ws error"
-                liftIO $ WS.sendCloseCode wsc 1003 ("?!?" :: Text)
+                WS.sendCloseCode wsc 1003 ("?!?" :: Text)
         -- yet still try to receive ctrl msg back from peer
         servWS
 
