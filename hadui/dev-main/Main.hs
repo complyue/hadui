@@ -13,6 +13,8 @@ import           RIO
 import           RIO.FilePath
 import qualified System.Directory              as D
 
+
+import           HaduiCfg
 import           HaduiRT
 
 import qualified Paths_hadui                   as Meta
@@ -28,11 +30,11 @@ main = do
         True -> return ()
         _    -> error "hadui web resource directory missing ?!"
 
-    lo <- haduiBackendLogOpts cfg
-    withLogFunc lo $ \lf ->
-        let haduiApp = HaduiFirstProcess { stackProjectRoot  = stackPrjRoot
-                                         , haduiResourceRoot = haduiResRoot
-                                         , haduiConfig       = cfg
-                                         , appLogFunc        = lf
-                                         }
-        in  runRIO haduiApp runHadui
+    -- lo <- haduiBackendLogOpts cfg
+    -- withLogFunc lo $ \lf ->
+    --     let haduiApp = HaduiFirstProcess { stackProjectRoot  = stackPrjRoot
+    --                                      , haduiResourceRoot = haduiResRoot
+    --                                      , haduiConfig       = cfg
+    --                                      , appLogFunc        = lf
+    --                                      }
+    --     in  runRIO haduiApp runHadui

@@ -3,7 +3,7 @@
  *
  */
 
-import { uiLog, clearLog } from "/log.js";
+import { hasLogBox, uiLog, clearLog } from "/log.js";
 
 export class WSC {
   constructor(url) {
@@ -25,8 +25,10 @@ export class WSC {
     this.waiters = [];
   }
 
-  async handleError(err, tb) {
-    console.error("Unexpected WS error:", err, tb);
+  async handleError(err, errDetails) {
+    console.error("Unexpected WS error: ", err, errDetails);
+    debugger;
+    if (hasLogBox()) uiLog(err, "err-msg", errDetails);
   }
 
   /**

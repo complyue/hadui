@@ -9,13 +9,13 @@ let logBox = $(".LogBox"),
 let lastAnimTime = 0,
   logAnimTask = null;
 
-export function clearLog() {
-  logBox.empty();
+export function hasLogBox() {
+  return logBox.length > 0;
 }
 
 export function uiLog(msg, type = "msg", details = undefined) {
-  if (logBox.length < 1) {
-    console.error("No LogBox in page! Msg to log:", msg, type);
+  if (!hasLogBox()) {
+    console.log("No LogBox in page to log this message:", msg, type, details);
     return;
   }
 
@@ -60,6 +60,10 @@ export function uiLog(msg, type = "msg", details = undefined) {
   } else {
     logAnimTask = setTimeout(animNewLog, remainDelay);
   }
+}
+
+export function clearLog() {
+  logBox.empty();
 }
 
 export default uiLog;

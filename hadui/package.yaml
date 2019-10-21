@@ -27,6 +27,7 @@ dependencies:
   - base
   - rio
   - text
+  - bytestring
   - directory
   - aeson
   - aeson-qq
@@ -52,14 +53,33 @@ library:
 executables:
   hadui:
     main: Main.hs
-    source-dirs: app
+    source-dirs: pub-main
     dependencies:
       - hadui
 
     ghc-options:
-      # first process of hadui itself handles light http traffics only,
-      # no need of much parallelism, but more than 1 native threads may
-      # help to avoid quirks in single-threaded cooperative scheduling.
+      # in publication mode, the `hadui` executable is just a
+      # thin wrapper to launch `stack ghci` with 'HaduiPub' as
+      # the interactive GHC frontend.
+      # but more than 1 native threads could help avoiding quirks
+      # in single-threaded cooperative scheduling.
       - -threaded
       - -rtsopts
       - -with-rtsopts=-maxN2
+
+  hadui-dev:
+    main: Main.hs
+    source-dirs: dev-main
+    dependencies:
+      - hadui
+
+    ghc-options:
+      # in development mode, the hadui process only handles light
+      # http traffics, no need of much parallelism.
+      # but more than 1 native threads could help avoiding quirks
+      # in single-threaded cooperative scheduling.
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-maxN2
+# TODO define hadui-dap to be integrated with VSCode to provide
+#      debuggability.

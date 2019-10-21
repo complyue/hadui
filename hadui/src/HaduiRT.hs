@@ -13,105 +13,331 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE QuasiQuotes #-}
 
 -- | hadui runtime
 module HaduiRT
-    ( UIO(..)
-    , UserInterfaceOutput(..)
-    , runUIO
-    , mustUIO
-    , initUIO
-    , HaduiConfig(..)
-    , loadHaduiConfig
-    , haduiBackendLogOpts
-    , HaduiFirstProcess(..)
-    , runHadui
+    ( MsgToUI(..)
+    , uiLog
+    , uiClearLog
+    , uiComm
+    , haduiExecStmt
+    , haduiExecGhc
+    , haduiPubServer
     )
 where
 
 import           RIO
 import qualified RIO.Text                      as T
+import qualified RIO.Text.Lazy                 as TL
 import           RIO.FilePath
 
-import           System.IO.Unsafe
+import qualified Data.ByteString.Builder       as SB
 
+import           Data.Dynamic                   ( Dynamic(..) )
+
+import           Data.Yaml.Aeson
+
+import qualified GHC
+import qualified HscTypes                      as GHC
+import qualified ErrUtils                      as GHC
+import qualified Panic                         as GHC
+import qualified GhcMonad                      as GHC
+import qualified GhcPlugins                    as GHC
+
+import           System.IO.Unsafe
+import qualified System.Directory              as D
 import           System.Posix.Types
 import           System.Posix.Process
 import           System.Posix.IO
-import qualified System.Directory              as D
-
-import           UnliftIO.Concurrent
 import           UnliftIO.Process
-
-import           Data.Yaml.Aeson
+import           UnliftIO.Concurrent
 
 import           Network.Socket
 import qualified Network.WebSockets            as WS
 
-import           Snap.Core               hiding ( logError )
-import           Snap.Http.Server
-import           Snap.Util.FileServe
+import qualified Data.Aeson                    as A
+import           Data.Aeson.QQ                  ( aesonQQ )
+
+import qualified Snap.Core                     as Snap
+import qualified Snap.Http.Server              as Snap
+import qualified Snap.Util.FileServe           as Snap
+
+import           HaduiCfg
+import           HaduiMonad
+
+import qualified Paths_hadui                   as Meta
 
 
--- | The monad for User Interface Output
--- UIO is output only, conversely to IO (which stands for Input/Output),
--- user inputs shall be facilitated with a registry of 'MVar's,
--- those get filled with 'IoC' from UI widgets.
-newtype UIO a = UIO { unUIO :: ReaderT UserInterfaceOutput IO a }
-    deriving (Functor, Applicative, Monad, MonadIO,
-        MonadReader UserInterfaceOutput, MonadThrow)
+-- | Communicate a json command back to the front UI, via current
+-- WebSocket connection in context.
+--
+-- The schema/protocol of json based communication is facilitated
+-- by `wsc.js`, where the command form:
+--  `{"type":"call", "method": "<name>", "args": <...>}`
+-- is open at each hadui application's discrepancy.
+--
+-- A hadui aware stack project implements websocket methods in 
+-- `hadui/hadui-custom.js` under the root directory.
+uiComm :: A.ToJSON a => a -> UIO ()
+uiComm jsonCmd = do
+    uio <- ask
+    let txtPayload = A.encode jsonCmd
+        txtPacket  = WS.Text txtPayload Nothing
+    liftIO $ withMVar (haduiGIL uio) $ \case
+        Nothing ->
+            runUIO uio
+                $  logError
+                $  display
+                $  "No ws in context for comm of: "
+                <> (Utf8Builder $ SB.lazyByteString txtPayload)
+        Just wsc -> WS.sendDataMessage wsc txtPacket
+    return ()
 
-data UserInterfaceOutput = UserInterfaceOutput {
-    haduiProjectRoot :: FilePath
-    , haduiCommMutex :: MVar ()
-    , haduiWebSocket :: WS.Connection
 
-    , backendLogFunc :: !LogFunc
-    }
+data MsgToUI = TextMsg Text
+    | DetailedMsg Text TheDetails
+    | ErrorMsg Text
+    | DetailedErrorMsg Text TheDetails
+    | RawHtmlMsg Text -- this and more TBD
+type TheDetails = Text
 
-instance HasLogFunc UserInterfaceOutput where
-    logFuncL = lens backendLogFunc (\x y -> x { backendLogFunc = y })
+uiLog :: MsgToUI -> UIO ()
+uiLog msg = case msg of
+    TextMsg msgText -> uiComm [aesonQQ|{
+"type": "msg"
+, "msgText": #{msgText}
+}|]
+    DetailedMsg msgText msgDetails -> uiComm [aesonQQ|{
+"type": "msg"
+, "msgText": #{msgText}
+, "msgDetails": #{msgDetails}
+}|]
+    ErrorMsg errText -> uiComm [aesonQQ|{
+"type": "msg"
+, "msgText": #{errText}
+, "msgType": "err-msg"
+}|]
+    DetailedErrorMsg errText errDetails -> uiComm [aesonQQ|{
+"type": "msg"
+, "msgText": #{errText}
+, "msgType": "err-msg"
+, "msgDetails": #{errDetails}
+}|]
+    -- more TBD
+    _ -> pure ()
 
-runUIO :: MonadIO m => UserInterfaceOutput -> UIO a -> m a
-runUIO uio (UIO (ReaderT f)) = liftIO (f uio)
+uiClearLog :: UIO ()
+uiClearLog = uiComm [aesonQQ|{
+"type": "clear"
+}|]
 
 
-initUIO :: Int -> IO UserInterfaceOutput
-initUIO wsfd = do
-    uninitialized <- isEmptyMVar _globalUIO
-    unless uninitialized $ error "initUIO reentrance ?!"
+-- | Execute an GHC action with GHC errors caught and displayed in web UI
+haduiExecGhc :: GHC.Ghc () -> UIO ()
+haduiExecGhc ghcAction = do
+    uio <- ask
+    let ghcSession = haduiGhcSession uio
+        logGhcExc exc = do
+            let errDetails = tshow exc
+            runUIO uio $ uiLog $ DetailedErrorMsg "GHC error: " errDetails
+        logSrcError err = do
+            dynFlags <- GHC.getSessionDynFlags
+            -- TODO use colors to highlight the error information
+            let errDetails = T.pack $ unlines $ map
+                    (GHC.showSDoc dynFlags)
+                    (GHC.pprErrMsgBagWithLoc $ GHC.srcErrorMessages err)
+            runUIO uio $ uiLog $ DetailedErrorMsg "Source error: " errDetails
+    liftIO
+        $ (flip GHC.reflectGhc) ghcSession
+        $ GHC.handleGhcException logGhcExc
+        $ GHC.handleSourceError logSrcError --
+                                ghcAction
 
-    (stackPrjRoot, cfg) <- loadHaduiConfig
-    lo                  <- haduiBackendLogOpts cfg
-    -- todo teardown 'lf' once the log target needs,
-    -- not needed as we only log to stderr by far
-    (lf, _ :: IO ())    <- newLogFunc lo
-    mu                  <- newMVar ()
-    wsc                 <- websocketFromFD wsfd
-    let uio = UserInterfaceOutput { haduiProjectRoot = stackPrjRoot
-                                  , haduiCommMutex   = mu
-                                  , haduiWebSocket   = wsc
-                                  , backendLogFunc   = lf
-                                  }
-    putMVar _globalUIO uio
-    runUIO uio
-        $  logInfo
-        $  "hadui interactive frontend serving wsfd="
-        <> (display $ tshow wsfd)
-    return uio
+haduiExecStmt :: Text -> UIO ()
+haduiExecStmt stmt = haduiExecGhc $ do
+    -- have 'GHC.execLineNumber' start from 0 so line numbers in error
+    -- report will match original source.
+    _execResult <- GHC.execStmt
+        ("mustUIO $\n"  -- hint required type with this line prepended
+                       ++ T.unpack stmt)
+        GHC.execOptions { GHC.execSourceFile = "<hadui-adhoc>"
+                        , GHC.execLineNumber = 0
+                        }
+    -- todo say sth about the result to front UI ?
+    return ()
 
-_globalUIO :: MVar UserInterfaceOutput
-{-# NOINLINE _globalUIO #-}
-_globalUIO = unsafePerformIO newEmptyMVar
 
--- | every statement will be lifted by this function into IO monad for GHCi to execute.
--- this also very explicitly hints the expected monad type for all statements to eval.
-mustUIO :: NFData a => UIO a -> IO ()
-mustUIO m = do
-    uio <- readMVar _globalUIO
-    v   <- runUIO uio m
-    _   <- pure $!! v -- force it to be executed
-    pure ()
+-- serve a ws until it's disconnected
+haduiServeWS :: WS.Connection -> UserInterfaceOutput -> IO ()
+haduiServeWS wsc uio =
+    let
+        servOnePkt = do
+            pkt <- WS.receiveDataMessage wsc
+            case pkt of
+                (WS.Text _bytes (Just pktText)) ->
+                    runUIO uio
+                        $ withHaduiFront wsc
+                        $ haduiExecStmt
+                        $ TL.toStrict pktText
+                (WS.Binary _bytes) -> do
+                    runUIO uio
+                        $ logError "hadui received binary packet from ws ?!"
+                    WS.sendCloseCode wsc 1003 ("?!?" :: Text)
+                _ -> do
+                    runUIO uio $ logError
+                        "hadui received unknown packet from ws ?!"
+                    WS.sendCloseCode wsc 1003 ("?!?" :: Text)
+            -- anyway we should continue receiving, even after close request sent, 
+            -- we are expected to process a CloseRequest ctrl message from peer.
+            servOnePkt
+    in  catch servOnePkt $ \exc -> case exc of
+            WS.CloseRequest closeCode closeReason
+                | closeCode == 1000 || closeCode == 1001 -> runUIO uio
+                $ logDebug "hadui ws closed normally."
+                | otherwise -> do
+                    runUIO uio
+                        $  logError
+                        $  display
+                        $  "hadui ws closed with code "
+                        <> display closeCode
+                        <> " and reason ["
+                        <> (Utf8Builder $ SB.lazyByteString closeReason)
+                        <> "]"
+                    -- yet still try to receive ctrl msg back from peer
+                    haduiServeWS wsc uio
+            WS.ConnectionClosed ->
+                runUIO uio $ logDebug $ "hadui ws disconnected."
+            _ -> runUIO uio $ logError "hadui unexpected ws error"
+
+
+haduiPubServer :: GHC.Ghc ()
+haduiPubServer = do
+    dataDir <- liftIO Meta.getDataDir
+    let haduiResRoot = dataDir </> "web"
+    unlessM (liftIO $ D.doesDirectoryExist haduiResRoot)
+        $ error "hadui web resource directory missing ?!"
+
+    uio <- initUIO
+    let cfg = haduiConfig uio
+
+    runUIO uio $ do
+        logDebug
+            $  "hadui using resource dir: ["
+            <> fromString haduiResRoot
+            <> "]"
+        logInfo
+            $  "hadui publishing project at ["
+            <> fromString (haduiProjectRoot uio)
+            <> "]"
+        logDebug $ "hadui with-ghc: \n  " <> display (withGHC cfg)
+        logDebug $ "hadui ghci-options: \n" <> display
+            (T.unlines $ ("  " <>) <$> ghciOptions cfg)
+        logDebug $ "hadui ghc-options: \n" <> display
+            (T.unlines $ ("  " <>) <$> ghcOptions cfg)
+
+    -- serve websockets in background threads
+    let
+        listenWS addr =
+            bracket
+                    (socket (addrFamily addr)
+                            (addrSocketType addr)
+                            (addrProtocol addr)
+                    )
+                    close
+                $ \sock -> do
+                    -- close-on-exec for this listening socket
+                      withFdSocket sock setCloseOnExecIfNeeded
+
+                    -- TODO on Ubuntu 18.04, it may fail even port
+                    --      not really in use without reuse addr,
+                    -- it'll create confusion when another process
+                    -- is accepting the ws request, we'd prefer not
+                    -- to proceed if we can not exclusively listen
+                    -- the port.
+                      setSocketOption sock ReuseAddr 1
+
+                      bind sock $ addrAddress addr
+                      listen sock 200
+
+                      let
+                          acceptWS = do
+                              (conn, wsPeerAddr) <- accept sock
+                              let
+                                  serveWSC = do
+                                      runUIO uio
+                                          $  logDebug
+                                          $  "hadui ws accepted: "
+                                          <> display (tshow wsPeerAddr)
+                                      pconn <-
+                                          WS.makePendingConnection conn
+                                              $ WS.defaultConnectionOptions
+                                                    { WS.connectionStrictUnicode =
+                                                        True
+                                                    }
+                                      wsc <- WS.acceptRequest pconn
+                                      haduiServeWS wsc uio
+                              _ <- forkFinally serveWSC $ \case
+                                  Left exc ->
+                                      runUIO uio
+                                          $  logError
+                                          $  "hadui failed with ws serving: "
+                                          <> display (tshow exc)
+                                  Right _ -> pure ()
+                              acceptWS -- tail recursion
+                      acceptWS
+    liftIO $ do
+        addrs <- getAddrInfo
+            (Just $ defaultHints { addrSocketType = Stream })
+            (Just $ T.unpack $ bindInterface cfg)
+            (Just $ show $ wsPort cfg)
+        for_ addrs $ \addr -> forkFinally (listenWS addr) $ \case
+            Left exc ->
+                runUIO uio
+                    $  logError
+                    $  "hadui failed with ws listening: "
+                    <> display (tshow exc)
+            Right _ -> pure ()
+
+
+
+    -- continue to serve http in main thread
+    let httpCfg =
+            Snap.setBind (encodeUtf8 $ bindInterface cfg)
+                $ Snap.setPort (httpPort cfg)
+                $ Snap.setStartupHook httpListening
+                $ Snap.setVerbose False
+                $ Snap.setAccessLog Snap.ConfigNoLog
+                $ Snap.setErrorLog (Snap.ConfigIoLog logHttpError) mempty
+        logHttpError msgBytes = case decodeUtf8' msgBytes of
+            Left  exc -> error $ "hadui unexpected encoding error: " ++ show exc
+            Right msg -> runUIO uio $ logError $ display msg
+        httpListening httpInfo = runUIO uio $ do
+            listenAddrs <- liftIO
+                $ sequence (getSocketName <$> Snap.getStartupSockets httpInfo)
+            logInfo $ "hadui available at: " <> (display . T.unwords)
+                (("http://" <>) . tshow <$> listenAddrs)
+
+        dirServCfg   = Snap.fancyDirectoryConfig
+        prjResRoot   = haduiProjectRoot uio </> "hadui"
+        prjFrontFile = prjResRoot </> "front.html"
+        !wsPortBytes = encodeUtf8 $ tshow $ wsPort cfg
+
+    liftIO
+        $   Snap.httpServe httpCfg
+        -- serving ws port inquiry from js
+        $   Snap.path ":" (Snap.writeBS wsPortBytes)
+        -- map '/' to front.html in either directory
+        <|> Snap.path
+                ""
+                (liftIO (D.doesFileExist prjFrontFile) >>= \case
+                    True  -> Snap.serveFile prjFrontFile
+                    False -> Snap.serveFile (haduiResRoot </> "front.html")
+                )
+        -- other static files
+        <|> Snap.serveDirectoryWith dirServCfg prjResRoot
+        <|> Snap.serveDirectoryWith dirServCfg haduiResRoot
+
 
 websocketFromFD :: Int -> IO WS.Connection
 websocketFromFD fd = do
@@ -120,279 +346,3 @@ websocketFromFD fd = do
         $ WS.defaultConnectionOptions { WS.connectionStrictUnicode = True }
     WS.acceptRequest pconn
 
-
-
-loadHaduiConfig :: IO (FilePath, HaduiConfig)
-loadHaduiConfig =
-    readProcessWithExitCode "/usr/bin/env"
-                            ["stack", "path", "--project-root"]
-                            ""
-        >>= \case
-                (ExitSuccess, outBytes, "") ->
-                    let stackPrjRoot  = (T.unpack . T.strip . T.pack) outBytes
-                        haduiYamlFile = stackPrjRoot </> "hadui.yaml"
-                    in  D.doesFileExist haduiYamlFile
-                            >>= \case
-                                    -- TODO this segfaults on OSX in ws subprocess,
-                                    --      to figure out the situation.
-                                    True -> decodeFileThrow haduiYamlFile
-                                    -- parse empty dict for all defaults
-                                    _    -> decodeThrow "{}"
-                            >>= \cfg -> return (stackPrjRoot, cfg)
-                _ -> error "Can not determine stack project root."
-
-
-data HaduiConfig = HaduiConfig {
-    bindInterface :: Text
-    , httpPort :: Int
-    , wsPort :: Int
-    , logLevel :: Text
-    , withGHC :: Text
-    , ghciOptions :: [Text]
-    , ghcOptions :: [Text]
-    } deriving (Eq,Show )
-
-instance FromJSON HaduiConfig where
-    parseJSON (Object v) =
-        HaduiConfig
-            <$> v
-            .:? "bind-interface"
-            .!= "127.0.0.1"
-            <*> v
-            .:? "http-port"
-            .!= 5050
-            <*> v
-            .:? "ws-port"
-            .!= 5051
-            <*> v
-            .:? "log-level"
-            .!= "INFO"
-            <*> v
-            .:? "with-ghc"
-            .!= "ghc-ife" -- TODO default to ghc once ':frontend' cmd is supported officially
-            <*> v
-            .:? "ghci-options"
-            .!= ["-fobject-code"]
-            <*> v
-            .:? "ghc-options"
-            .!= []
-    parseJSON _ = fail "Expected Object for Config value"
-
-
-haduiBackendLogOpts :: HaduiConfig -> IO LogOptions
-haduiBackendLogOpts cfg = do
-    let ll = case logLevel cfg of
-            "DEBUG" -> LevelDebug
-            "WARN"  -> LevelWarn
-            "ERROR" -> LevelError
-            _       -> LevelInfo
-        verbose = ll < LevelWarn -- go verbose since info level
-    lo <- logOptionsHandle stderr verbose
-    return $ setLogMinLevel ll lo
-
-
-data HaduiFirstProcess = HaduiFirstProcess {
-    stackProjectRoot :: FilePath
-    , haduiResourceRoot :: FilePath
-    , haduiConfig :: HaduiConfig
-    , appLogFunc :: !LogFunc
-    }
-
-instance HasLogFunc HaduiFirstProcess where
-    logFuncL = lens appLogFunc (\x y -> x { appLogFunc = y })
-
-
-runHadui :: RIO HaduiFirstProcess ()
-runHadui = do
-    app <- ask
-    let cfg = haduiConfig app
-
-    logInfo
-        $  "hadui serving project at ["
-        <> fromString (stackProjectRoot app)
-        <> "]"
-    logDebug
-        $  "hadui using resource dir: ["
-        <> fromString (haduiResourceRoot app)
-        <> "]"
-    logDebug $ "hadui with-ghc: \n  " <> display (withGHC cfg)
-    logDebug $ "hadui ghci-options: \n" <> display
-        (T.unlines $ ("  " <>) <$> ghciOptions cfg)
-    logDebug $ "hadui ghc-options: \n" <> display
-        (T.unlines $ ("  " <>) <$> ghcOptions cfg)
-
-
-    addrs <- liftIO $ getAddrInfo
-        (Just $ defaultHints { addrSocketType = Stream })
-        (Just $ T.unpack $ bindInterface cfg)
-        (Just $ show $ wsPort cfg)
-    let listenWS addr = do
-            sock <- socket (addrFamily addr)
-                           (addrSocketType addr)
-                           (addrProtocol addr)
-
-            -- TODO on Ubuntu 18.04, it may fail even port
-            --      not really in use without reuse addr,
-            -- it'll create confusion when another process
-            -- is accepting the ws request, we'd prefer not
-            -- to proceed if we can not exclusively listen
-            -- the port.
-            setSocketOption sock ReuseAddr 1
-
-            withFdSocket sock setCloseOnExecIfNeeded
-            bind sock $ addrAddress addr
-            listen sock 20
-            return sock
-        wsFailure :: SomeException -> RIO HaduiFirstProcess ()
-        wsFailure exc = do
-            logError $ "hadui failed with ws serving: " <> display (tshow exc)
-            liftIO $ exitImmediately $ ExitFailure 1
-
-    -- serve websockets in background threads
-    for_ addrs $ \addr -> do
-        _ <- forkIO $ handle wsFailure $ bracket (liftIO $ listenWS addr)
-                                                 (liftIO . close)
-                                                 upstartHandler
-        return ()
-    -- continue to serve http in main thread
-
-    let httpCfg =
-            setBind (encodeUtf8 $ bindInterface cfg)
-                $ setPort (httpPort cfg)
-                $ setStartupHook httpListening
-                $ setVerbose False
-                $ setAccessLog ConfigNoLog
-                $ setErrorLog (ConfigIoLog logHttpError) mempty
-        logHttpError msgBytes = case decodeUtf8' msgBytes of
-            Left  exc -> error $ "hadui unexpected encoding error: " ++ show exc
-            Right msg -> runRIO app $ logError $ display msg
-        httpListening httpInfo = runRIO app $ do
-            listenAddrs <- liftIO
-                $ sequence (getSocketName <$> getStartupSockets httpInfo)
-            logInfo $ "hadui available at: " <> (display . T.unwords)
-                (("http://" <>) . tshow <$> listenAddrs)
-
-        dirServCfg   = fancyDirectoryConfig
-        prjResRoot   = stackProjectRoot app </> "hadui"
-        haduiResRoot = haduiResourceRoot app
-        prjFrontFile = prjResRoot </> "front.html"
-        !wsPortBytes = encodeUtf8 $ tshow $ wsPort cfg
-
-    liftIO
-        $   httpServe httpCfg
-        -- serving ws port inquiry from js
-        $   path ":" (writeBS wsPortBytes)
-        -- map '/' to front.html in either directory
-        <|> path
-                ""
-                (liftIO (D.doesFileExist prjFrontFile) >>= \case
-                    True  -> serveFile prjFrontFile
-                    False -> serveFile (haduiResRoot </> "front.html")
-                )
-        -- other static files
-        <|> serveDirectoryWith dirServCfg prjResRoot
-        <|> serveDirectoryWith dirServCfg haduiResRoot
-
-
-upstartHandler :: Socket -> RIO HaduiFirstProcess ()
-upstartHandler sock = do
-    app  <- ask
-
-    addr <- liftIO $ getSocketName sock
-    logInfo $ "hadui listening ws://" <> display (tshow addr)
-
-    let cfg            = haduiConfig app
-        !ghcExecutable = T.unpack $ withGHC cfg
-        !extraOpts     = RIO.concat
-            (  [ ["--ghci-options", show opt] | opt <- ghciOptions cfg ]
-            ++ [ ["--ghc-options", show opt] | opt <- ghcOptions cfg ]
-            )
-
-        acceptWSC = liftIO $ accept sock
-        closeHandle (conn, _) = liftIO $ do
-            wsfd <- unsafeFdSocket conn
-            closeFd $ Fd wsfd
-
-        spawnHandler (conn, wsPeerAddr) = do
-            logDebug $ "hadui ws accepted: " <> display (tshow wsPeerAddr)
-            liftIO $ do
-                wsfd <- unsafeFdSocket conn
-
-                -- clear FD_CLOEXEC flag so it can be passed to subprocess
-                setFdOption (Fd wsfd) CloseOnExec False
-
-                -- launch `stack ghci` with hadui's GHC frontend to serve the ws
-                pid <- forkProcess $ executeFile
-                    "/usr/bin/env"
-                    False
-                    ([ "stack"
-                     , "ghci"
-                     , "--with-ghc"
-                     , ghcExecutable
-
-                     -- use UIO which reexports RIO as prelude
-                     , "--ghc-options"
-                     , "-XNoImplicitPrelude"
-
-                     -- really hope that Haskell the language unify the string
-                     -- types (with utf8 seems the norm) sooner than later
-                     , "--ghc-options"
-                     , "-XOverloadedStrings"
-
-                     -- to allow literal Text/Int without explicit type anno
-                     , "--ghc-options"
-                     , "-XExtendedDefaultRules"
-
-                     -- the frontend trigger
-                     , "--ghci-options"
-                     , "-e \":frontend HaduiGHCi\" -ffrontend-opt " ++ show wsfd
-                     ]
-                    ++ extraOpts -- opts from hadui.yaml
-                    )
-                    Nothing
-
-                runRIO app
-                    $  logDebug
-                    $  display
-                    $  "hadui started ws handler pid: "
-                    <> tshow pid
-
-                -- say sth on exit of the subprocess, this also prevents
-                -- the exited subprocess becoming a zombie.
-                void $ forkIO $ do
-                    ps <- getProcessStatus True True pid
-                    void $ runRIO app $ case ps of
-                        Nothing -> error "the impossible happens here"
-                        Just (Exited ExitSuccess) ->
-                            logDebug
-                                $  display
-                                $  "hadui ws handler process "
-                                <> tshow pid
-                                <> " exited."
-                        Just (Exited exitCode) ->
-                            logError
-                                $  display
-                                $  "hadui ws handler process "
-                                <> tshow pid
-                                <> " exited with "
-                                <> tshow exitCode
-                        Just (Terminated sig coreDumped) ->
-                            logWarn
-                                $  display
-                                $  "hadui ws handler process "
-                                <> tshow pid
-                                <> " killed by signal "
-                                <> tshow sig
-                                <> if coreDumped
-                                       then " with core dumped"
-                                       else ""
-                        Just (Stopped sig) ->
-                            logWarn
-                                $  display
-                                $  "hadui ws handler process "
-                                <> tshow pid
-                                <> " stopped by signal "
-                                <> tshow sig
-
-    -- always close fd of the ws socket in parent process
-    forever $ bracket acceptWSC closeHandle spawnHandler
