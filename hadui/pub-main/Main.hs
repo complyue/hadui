@@ -40,6 +40,13 @@ main = do
         False
         (  [ "stack"
            , "ghci"
+
+           -- TODO stack will ask through the tty if multiple executables
+           -- are defined in the project, hadui won't play well in this
+           -- case. file an issue with stack, maybe introduce a new cmdl
+           -- option to load all library modules with no question asked.
+
+           -- use designated GHC
            , "--with-ghc"
            , ghcExecutable
 

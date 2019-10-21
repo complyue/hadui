@@ -33,7 +33,7 @@ $("button[name=clear-log]").on("click", function() {
 
 $(async function() {
   try {
-    uiLog("Preparing hadui backend ...");
+    uiLog("Dialing hadui backend ...");
     await haduiWSC.dial();
   } catch (err) {
     let details = err ? err.stack : err;

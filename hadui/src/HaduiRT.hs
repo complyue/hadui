@@ -170,7 +170,10 @@ haduiExecStmt stmt = haduiExecGhc $ do
 
 -- serve a ws until it's disconnected
 haduiServeWS :: WS.Connection -> UserInterfaceOutput -> IO ()
-haduiServeWS wsc uio =
+haduiServeWS wsc uio = do
+    runUIO uio $ withHaduiFront wsc $ uiLog $ DetailedMsg
+        "hadui ready for stack project at: "
+        (T.pack $ haduiProjectRoot uio)
     let
         servOnePkt = do
             pkt <- WS.receiveDataMessage wsc
@@ -191,24 +194,23 @@ haduiServeWS wsc uio =
             -- anyway we should continue receiving, even after close request sent, 
             -- we are expected to process a CloseRequest ctrl message from peer.
             servOnePkt
-    in  catch servOnePkt $ \exc -> case exc of
-            WS.CloseRequest closeCode closeReason
-                | closeCode == 1000 || closeCode == 1001 -> runUIO uio
-                $ logDebug "hadui ws closed normally."
-                | otherwise -> do
-                    runUIO uio
-                        $  logError
-                        $  display
-                        $  "hadui ws closed with code "
-                        <> display closeCode
-                        <> " and reason ["
-                        <> (Utf8Builder $ SB.lazyByteString closeReason)
-                        <> "]"
-                    -- yet still try to receive ctrl msg back from peer
-                    haduiServeWS wsc uio
-            WS.ConnectionClosed ->
-                runUIO uio $ logDebug $ "hadui ws disconnected."
-            _ -> runUIO uio $ logError "hadui unexpected ws error"
+    catch servOnePkt $ \case
+        WS.CloseRequest closeCode closeReason
+            | closeCode == 1000 || closeCode == 1001 -> runUIO uio
+            $ logDebug "hadui ws closed normally."
+            | otherwise -> do
+                runUIO uio
+                    $  logError
+                    $  display
+                    $  "hadui ws closed with code "
+                    <> display closeCode
+                    <> " and reason ["
+                    <> (Utf8Builder $ SB.lazyByteString closeReason)
+                    <> "]"
+                -- yet still try to receive ctrl msg back from peer
+                haduiServeWS wsc uio
+        WS.ConnectionClosed -> runUIO uio $ logDebug $ "hadui ws disconnected."
+        _                   -> runUIO uio $ logError "hadui unexpected ws error"
 
 
 haduiPubServer :: GHC.Ghc ()
@@ -219,8 +221,16 @@ haduiPubServer = do
         $ error "hadui web resource directory missing ?!"
 
     uio <- initUIO
-    let cfg = haduiConfig uio
+    runUIO uio $ haduiExecGhc $ do
+        -- make 'UIO' in scope implicitly
+        GHC.getContext
+            >>= GHC.setContext
+            .   ((GHC.IIDecl $ GHC.simpleImportDecl $ GHC.mkModuleName "UIO") :)
+        _ <- GHC.runDecls "default (Text,Int)"
+        -- to allow string and number literals without explicit type anno
+        return ()
 
+    let cfg = haduiConfig uio
     runUIO uio $ do
         logDebug
             $  "hadui using resource dir: ["
