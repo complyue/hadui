@@ -24,12 +24,14 @@ where
 
 import           RIO
 import qualified RIO.Text                      as T
+import qualified RIO.ByteString.Lazy           as BL
 import           RIO.FilePath
+
 import           UnliftIO.Process
 
 import qualified System.Directory              as D
 
-import           Data.Yaml.Aeson
+import           Data.YAML
 
 
 loadHaduiConfig :: IO (FilePath, HaduiConfig)
@@ -43,12 +45,22 @@ loadHaduiConfig =
                         haduiYamlFile = stackPrjRoot </> "hadui.yaml"
                     in  D.doesFileExist haduiYamlFile
                             >>= \case
-                                    -- TODO this segfaults on OSX in ws subprocess,
-                                    --      to figure out the situation.
-                                    True -> decodeFileThrow haduiYamlFile
+                                    True -> withBinaryFile
+                                        haduiYamlFile
+                                        ReadMode
+                                        \h -> do -- TODO can this be point-free ?
+                                            bytes <- BL.hGetContents h
+                                            return $! decode1 bytes
+                                        -- following won't work coz laziness
+                                        -- (fmap decode1 . BL.hGetContents)
                                     -- parse empty dict for all defaults
-                                    _    -> decodeThrow "{}"
-                            >>= \cfg -> return (stackPrjRoot, cfg)
+                                    _ -> return $ decode1 "{}"
+                            >>= \case
+                                    Left yamlErr ->
+                                        error
+                                            $  "Error with hadui.yaml "
+                                            <> yamlErr
+                                    Right cfg -> return (stackPrjRoot, cfg)
                 _ -> error "Can not determine stack project root."
 
 data HaduiConfig = HaduiConfig {
@@ -61,8 +73,8 @@ data HaduiConfig = HaduiConfig {
     , ghcOptions :: [Text]
     } deriving (Eq,Show )
 
-instance FromJSON HaduiConfig where
-    parseJSON (Object v) =
+instance FromYAML HaduiConfig where
+    parseYAML = withMap "HaduiConfig" $ \v ->
         HaduiConfig
             <$> v
             .:? "bind-interface"
@@ -85,7 +97,6 @@ instance FromJSON HaduiConfig where
             <*> v
             .:? "ghc-options"
             .!= []
-    parseJSON _ = fail "Expected Object for Config value"
 
 
 haduiBackendLogOpts :: HaduiConfig -> IO LogOptions

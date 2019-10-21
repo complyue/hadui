@@ -29,10 +29,9 @@ dependencies:
   - text
   - bytestring
   - directory
+  - HsYAML
   - aeson
   - aeson-qq
-  - neat-interpolation
-  - yaml
   - unliftio
   - websockets
   - snap-core

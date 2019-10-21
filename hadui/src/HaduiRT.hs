@@ -34,10 +34,6 @@ import           RIO.FilePath
 
 import qualified Data.ByteString.Builder       as SB
 
-import           Data.Dynamic                   ( Dynamic(..) )
-
-import           Data.Yaml.Aeson
-
 import qualified GHC
 import qualified HscTypes                      as GHC
 import qualified ErrUtils                      as GHC
@@ -45,12 +41,7 @@ import qualified Panic                         as GHC
 import qualified GhcMonad                      as GHC
 import qualified GhcPlugins                    as GHC
 
-import           System.IO.Unsafe
 import qualified System.Directory              as D
-import           System.Posix.Types
-import           System.Posix.Process
-import           System.Posix.IO
-import           UnliftIO.Process
 import           UnliftIO.Concurrent
 
 import           Network.Socket
@@ -209,7 +200,7 @@ haduiServeWS wsc uio = do
                     <> "]"
                 -- yet still try to receive ctrl msg back from peer
                 haduiServeWS wsc uio
-        WS.ConnectionClosed -> runUIO uio $ logDebug $ "hadui ws disconnected."
+        WS.ConnectionClosed -> runUIO uio $ logDebug "hadui ws disconnected."
         _                   -> runUIO uio $ logError "hadui unexpected ws error"
 
 
