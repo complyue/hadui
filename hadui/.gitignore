@@ -3,3 +3,4 @@
 *.swp
 tarballs/
 .stack-work/
+/dist/
