@@ -135,7 +135,7 @@ initUIO = do
 -- | Execute a UIO action with the specified ws for current context
 withHaduiFront :: WS.Connection -> UIO a -> UIO a
 withHaduiFront wsc action = do
-    uio <- liftIO $ readIORef _globalUIO
+    uio <- ask
     let gil = haduiGIL uio
     liftIO $ bracket (swapMVar gil $ Just wsc) (swapMVar gil) $ \wscReplaced ->
         do
