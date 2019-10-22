@@ -68,8 +68,20 @@ ghc-options:
 stack build --exec hadui
 ```
 
+- or run development mode:
+
+```shell
+stack build --exec hadui-dev
+```
+
+> in development mode, you just refresh the browser page, the
+> backend process will be restarted, changed project source will
+> be recompiled automtically.
+
 - optionally, customize front UI for your project, by creating a
-  `hadui` folder besides your `stack.yaml`. take for example:
+  `hadui` folder besides your `stack.yaml`.
+
+  take for example:
   https://github.com/complyue/hadui-demo/tree/master/hadui
 
 ## Demo
