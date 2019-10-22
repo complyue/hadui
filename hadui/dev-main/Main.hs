@@ -12,23 +12,13 @@ where
 
 import           RIO
 import qualified RIO.Text                      as T
-import qualified RIO.Text.Lazy                 as TL
 import           RIO.FilePath
 
-import qualified Data.ByteString.Builder       as SB
 
 import qualified System.Directory              as D
 import           UnliftIO.Concurrent
 
 import           Network.Socket
-import qualified Network.WebSockets            as WS
-
-import qualified Data.Aeson                    as A
-import           Data.Aeson.QQ                  ( aesonQQ )
-
-import qualified Snap.Core                     as Snap
-import qualified Snap.Http.Server              as Snap
-import qualified Snap.Util.FileServe           as Snap
 
 import           System.Posix.Types
 import           System.Posix.Process
