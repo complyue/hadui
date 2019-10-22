@@ -125,7 +125,7 @@ initUIO = do
     GHC.getContext
         >>= GHC.setContext
         .   ((GHC.IIDecl $ GHC.simpleImportDecl $ GHC.mkModuleName "UIO") :)
-        -- to allow string and number literals without explicit type anno
+    -- to allow string and number literals without explicit type anno
     _ <- GHC.runDecls "default (Text,Int)"
 
     liftIO $ writeIORef _globalUIO uio

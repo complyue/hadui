@@ -17,12 +17,12 @@ module UIO
     , uiComm
 
     -- advanced harness
+    , withHaduiFront
     , haduiExecStmt
     , haduiExecGhc
     , mustUIO
     )
 where
-
 
 import           RIO
 
@@ -32,3 +32,4 @@ import           HaduiRT
 
 print :: Display a => a -> UIO ()
 print v = uiLog $ TextMsg $ textDisplay v
+
