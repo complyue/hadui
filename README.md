@@ -8,12 +8,23 @@
 
 ## Quick Start
 
-- create a stack project, with `extra-deps` in its `stack.yaml` including:
+- create a stack project with `hadui` as one of its dependencies,
+  in its `package.yaml` like:
+
+```yaml
+dependencies:
+  - base
+  - rio
+
+  - hadui
+```
+
+- have `extra-deps` in your project's `stack.yaml` including:
 
 ```yaml
 extra-deps:
   - github: complyue/hadui
-    commit: a80490404eba19aaa77bdbb3bb1c41f6bb570826
+    commit: 5dd260fada86157998df985bfb6df38a430df5f6
     subdirs:
       - hadui
 
