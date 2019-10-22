@@ -4,5 +4,5 @@
 stack build --exec hadui
 ```
 
-![hadui-demo-2-fe](https://user-images.githubusercontent.com/15646573/67267742-86564680-f4e5-11e9-9fc6-5f4459c18e87.png)
-![hadui-demo-2-be](https://user-images.githubusercontent.com/15646573/67267741-86564680-f4e5-11e9-9102-af7313b8b8d0.png)
+![hadui-demo-2-fe](https://user-images.githubusercontent.com/15646573/67268165-6410f880-f4e6-11e9-861e-ed779493d6af.png)
+![hadui-demo-2-be](https://user-images.githubusercontent.com/15646573/67268163-63786200-f4e6-11e9-86bc-6820a1314477.png)
