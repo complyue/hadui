@@ -86,8 +86,8 @@ stack build --exec hadui-dev
 ```
 
 > in development mode, you just refresh the browser page, the
-> backend process will be restarted, changed project source will
-> be recompiled automtically.
+> backend process will be restarted, and changed project source
+> get recompiled automatically.
 
 - optionally, customize front UI for your project, by creating a
   `hadui` folder besides your `stack.yaml`.
