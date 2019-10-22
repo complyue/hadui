@@ -24,7 +24,7 @@ dependencies:
 ```yaml
 extra-deps:
   - github: complyue/hadui
-    commit: 5dd260fada86157998df985bfb6df38a430df5f6
+    commit: stable
     subdirs:
       - hadui
 
