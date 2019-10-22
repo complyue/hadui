@@ -1,63 +1,72 @@
 <!DOCTYPE html>
 
 <head>
-    <title>hadui</title>
+  <title>hadui</title>
 
-    <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="icon" type="image/png" href="/favicon.png" />
 
+  <link rel="stylesheet" type="text/css" href="/vendor/mui/mui.min.css" />
 
-    <link rel="stylesheet" type="text/css" href="/vendor/mui/mui.min.css" />
+  <link rel="stylesheet" href="/vendor/cm/lib/codemirror.css" />
+  <link rel="stylesheet" href="/vendor/cm/addon/fold/foldgutter.css" />
+  <link rel="stylesheet" href="/vendor/cm/addon/dialog/dialog.css" />
+  <link rel="stylesheet" href="/vendor/cm/theme/monokai.css" />
 
-    <link rel="stylesheet" href="/vendor/cm/lib/codemirror.css">
-    <link rel="stylesheet" href="/vendor/cm/addon/fold/foldgutter.css">
-    <link rel="stylesheet" href="/vendor/cm/addon/dialog/dialog.css">
-    <link rel="stylesheet" href="/vendor/cm/theme/monokai.css">
+  <link rel="stylesheet" type="text/css" href="/hadui.css" />
+  <link rel="stylesheet" type="text/css" href="/hadui-custom.css" />
 
-    <link rel="stylesheet" type="text/css" href="/hadui.css" />
-    <link rel="stylesheet" type="text/css" href="/hadui-custom.css" />
+  <script src="/vendor/jquery/jquery.js"></script>
 
+  <script src="/vendor/mui/mui.min.js"></script>
 
-    <script src="/vendor/jquery/jquery.js"></script>
+  <script src="/vendor/cm/lib/codemirror.js"></script>
+  <script src="/vendor/cm/mode/haskell.js"></script>
+  <script src="/vendor/cm/keymap/sublime.js"></script>
+  <script src="/vendor/cm/addon/search/searchcursor.js"></script>
+  <script src="/vendor/cm/addon/search/search.js"></script>
+  <script src="/vendor/cm/addon/dialog/dialog.js"></script>
+  <script src="/vendor/cm/addon/edit/matchbrackets.js"></script>
+  <script src="/vendor/cm/addon/edit/closebrackets.js"></script>
+  <script src="/vendor/cm/addon/comment/comment.js"></script>
+  <script src="/vendor/cm/addon/wrap/hardwrap.js"></script>
+  <script src="/vendor/cm/addon/fold/foldcode.js"></script>
+  <script src="/vendor/cm/addon/fold/brace-fold.js"></script>
 
-    <script src="/vendor/mui/mui.min.js"></script>
-
-    <script src="/vendor/cm/lib/codemirror.js"></script>
-    <script src="/vendor/cm/mode/haskell.js"></script>
-    <script src="/vendor/cm/keymap/sublime.js"></script>
-    <script src="/vendor/cm/addon/search/searchcursor.js"></script>
-    <script src="/vendor/cm/addon/search/search.js"></script>
-    <script src="/vendor/cm/addon/dialog/dialog.js"></script>
-    <script src="/vendor/cm/addon/edit/matchbrackets.js"></script>
-    <script src="/vendor/cm/addon/edit/closebrackets.js"></script>
-    <script src="/vendor/cm/addon/comment/comment.js"></script>
-    <script src="/vendor/cm/addon/wrap/hardwrap.js"></script>
-    <script src="/vendor/cm/addon/fold/foldcode.js"></script>
-    <script src="/vendor/cm/addon/fold/brace-fold.js"></script>
-
-    <script type="module" src="/hadui.js"></script>
-
+  <script type="module" src="/dev.js"></script>
 </head>
 
 <body>
+  <h3>
+    <a target="_blank" href="https://github.com/complyue/hadui">hadui</a>
+    <img width="16" height="16" type="image/png" src="/favicon.png" />
+    Web front UI for interactive stack projects
+    <a
+      style="font-size: 70%;"
+      target="_blank"
+      href="https://github.com/complyue/hadui/wiki"
+      >docs</a
+    >
+  </h3>
 
-    <h3><a target="_blank" href="https://github.com/complyue/hadui">hadui</a>
-        <img width="16" height="16" type="image/png" src="/favicon.png" />
-        Web front UI for interactive stack projects
-        <a style="font-size: 70%;" target="_blank" href="https://github.com/complyue/hadui/wiki">docs</a>
-    </h3>
+  <div class="LogArea">
+    <div class="LogBox"></div>
+  </div>
 
-    <div class="LogArea">
-        <div class="LogBox"></div>
-    </div>
+  <section id="coding_section">
+    <button name="crunch" class="mui-btn mui-btn--small mui-btn--primary">
+      Crunch !
+    </button>
+    <button name="clear-log" class="mui-btn mui-btn--small mui-btn--danger">
+      Clear Log
+    </button>
 
-    <section id="coding_section">
-        <button name="crunch" class="mui-btn mui-btn--small mui-btn--primary">Crunch !</button>
-        <button name="clear-log" class="mui-btn mui-btn--small mui-btn--danger">Clear Log</button>
+    <section id="main_code"></section>
 
-        <section id="main_code"></section>
-
-        <button name="crunch" class="mui-btn mui-btn--small mui-btn--primary">Crunch !</button>
-        <button name="clear-log" class="mui-btn mui-btn--small mui-btn--danger">Clear Log</button>
-    </section>
-
+    <button name="crunch" class="mui-btn mui-btn--small mui-btn--primary">
+      Crunch !
+    </button>
+    <button name="clear-log" class="mui-btn mui-btn--small mui-btn--danger">
+      Clear Log
+    </button>
+  </section>
 </body>

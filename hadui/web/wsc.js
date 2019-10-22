@@ -170,6 +170,10 @@ export class WSC {
       );
     });
   }
+
+  openWindow(url, target) {
+    window.open(url, target);
+  }
 }
 
 export default WSC;

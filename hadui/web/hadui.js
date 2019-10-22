@@ -2,34 +2,16 @@
  * hadui.js
  */
 
-import { uiLog, clearLog } from "/log.js";
+import { uiLog } from "/log.js";
 
-import { HaduiDefaultStmt, HaduiWSC } from "./hadui-custom.js";
+import { HaduiWSC } from "./hadui-custom.js";
 
 export const haduiWSC = new HaduiWSC();
 
-export const mainEditor = CodeMirror(document.getElementById("main_code"), {
-  value: HaduiDefaultStmt,
-  lineNumbers: true,
-  mode: "haskell",
-  keyMap: "sublime",
-  autoCloseBrackets: true,
-  matchBrackets: true,
-  showCursorWhenSelecting: true,
-  theme: "monokai",
-  tabSize: 2,
-  viewportMargin: Infinity
-});
-
-$("button[name=crunch]").on("click", async function() {
+export async function withHadui(haduiAct) {
   let ws = await haduiWSC.dial();
-  let mainCode = mainEditor.getValue();
-  uiLog("Executing stmt:", "msg", mainCode);
-  ws.send(mainEditor.getValue());
-});
-$("button[name=clear-log]").on("click", function() {
-  clearLog();
-});
+  haduiAct(ws);
+}
 
 $(async function() {
   try {
