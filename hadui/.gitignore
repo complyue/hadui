@@ -3,4 +3,5 @@
 *.swp
 tarballs/
 .stack-work/
+stack.yaml.lock
 /dist/
