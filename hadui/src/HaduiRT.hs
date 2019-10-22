@@ -23,7 +23,12 @@ module HaduiRT
     , uiComm
     , haduiExecStmt
     , haduiExecGhc
+
+    -- common routines among pub/dev/debug modes
     , haduiPubServer
+    , haduiDevServer
+    , haduiListenWSC
+    , haduiServeHttp
     )
 where
 
@@ -160,8 +165,8 @@ haduiExecStmt stmt = haduiExecGhc $ do
 
 
 -- serve a ws until it's disconnected
-haduiServeWS :: WS.Connection -> UserInterfaceOutput -> IO ()
-haduiServeWS wsc uio = do
+haduiServeWS :: UserInterfaceOutput -> WS.Connection -> IO ()
+haduiServeWS uio wsc = do
     runUIO uio $ withHaduiFront wsc $ uiLog $ DetailedMsg
         "hadui ready for stack project at: "
         (T.pack $ haduiProjectRoot uio)
@@ -199,7 +204,7 @@ haduiServeWS wsc uio = do
                     <> (Utf8Builder $ SB.lazyByteString closeReason)
                     <> "]"
                 -- yet still try to receive ctrl msg back from peer
-                haduiServeWS wsc uio
+                haduiServeWS uio wsc
         WS.ConnectionClosed -> runUIO uio $ logDebug "hadui ws disconnected."
         _                   -> runUIO uio $ logError "hadui unexpected ws error"
 
@@ -212,14 +217,6 @@ haduiPubServer = do
         $ error "hadui web resource directory missing ?!"
 
     uio <- initUIO
-    runUIO uio $ haduiExecGhc $ do
-        -- make 'UIO' in scope implicitly
-        GHC.getContext
-            >>= GHC.setContext
-            .   ((GHC.IIDecl $ GHC.simpleImportDecl $ GHC.mkModuleName "UIO") :)
-        _ <- GHC.runDecls "default (Text,Int)"
-        -- to allow string and number literals without explicit type anno
-        return ()
 
     let cfg = haduiConfig uio
     runUIO uio $ do
@@ -238,6 +235,25 @@ haduiPubServer = do
             (T.unlines $ ("  " <>) <$> ghcOptions cfg)
 
     -- serve websockets in background threads
+    runRIO uio $ haduiListenWSC cfg close $ \conn -> do
+        pconn <- WS.makePendingConnection conn
+            $ WS.defaultConnectionOptions { WS.connectionStrictUnicode = True }
+        wsc <- WS.acceptRequest pconn
+        haduiServeWS uio wsc
+
+    -- continue to serve http in main thread
+    runRIO uio $ haduiServeHttp cfg (haduiProjectRoot uio) haduiResRoot
+
+
+haduiListenWSC
+    :: HasLogFunc env
+    => HaduiConfig
+    -> (Socket -> IO ())
+    -> (Socket -> IO ())
+    -> RIO env ()
+haduiListenWSC cfg wscDisposer wscHandler = do
+    env <- ask
+
     let
         listenWS addr =
             bracket
@@ -246,9 +262,9 @@ haduiPubServer = do
                             (addrProtocol addr)
                     )
                     close
-                $ \sock -> do
+                $ \listeningSock -> do
                     -- close-on-exec for this listening socket
-                      withFdSocket sock setCloseOnExecIfNeeded
+                      withFdSocket listeningSock setCloseOnExecIfNeeded
 
                     -- TODO on Ubuntu 18.04, it may fail even port
                     --      not really in use without reuse addr,
@@ -256,37 +272,30 @@ haduiPubServer = do
                     -- is accepting the ws request, we'd prefer not
                     -- to proceed if we can not exclusively listen
                     -- the port.
-                      setSocketOption sock ReuseAddr 1
+                      setSocketOption listeningSock ReuseAddr 1
 
-                      bind sock $ addrAddress addr
-                      listen sock 200
+                      bind listeningSock $ addrAddress addr
+                      listen listeningSock 200
 
                       let
-                          acceptWS = do
-                              (conn, wsPeerAddr) <- accept sock
-                              let
-                                  serveWSC = do
-                                      runUIO uio
-                                          $  logDebug
-                                          $  "hadui ws accepted: "
-                                          <> display (tshow wsPeerAddr)
-                                      pconn <-
-                                          WS.makePendingConnection conn
-                                              $ WS.defaultConnectionOptions
-                                                    { WS.connectionStrictUnicode =
-                                                        True
-                                                    }
-                                      wsc <- WS.acceptRequest pconn
-                                      haduiServeWS wsc uio
-                              _ <- forkFinally serveWSC $ \case
-                                  Left exc ->
-                                      runUIO uio
-                                          $  logError
-                                          $  "hadui failed with ws serving: "
-                                          <> display (tshow exc)
-                                  Right _ -> pure ()
-                              acceptWS -- tail recursion
-                      acceptWS
+                          acceptWSC = do
+                              (conn, wsPeerAddr) <- accept listeningSock
+                              runRIO env
+                                  $  logDebug
+                                  $  "hadui ws accepted: "
+                                  <> display (tshow wsPeerAddr)
+                              _ <- forkFinally (wscHandler conn) $ \wsResult ->
+                                  do
+                                      case wsResult of
+                                          Left exc ->
+                                              runRIO env
+                                                  $ logError
+                                                  $ "hadui failed with ws handling: "
+                                                  <> display (tshow exc)
+                                          Right _ -> pure ()
+                                      wscDisposer conn
+                              acceptWSC -- tail recursion
+                      acceptWSC
     liftIO $ do
         addrs <- getAddrInfo
             (Just $ defaultHints { addrSocketType = Stream })
@@ -294,15 +303,17 @@ haduiPubServer = do
             (Just $ show $ wsPort cfg)
         for_ addrs $ \addr -> forkFinally (listenWS addr) $ \case
             Left exc ->
-                runUIO uio
+                runRIO env
                     $  logError
                     $  "hadui failed with ws listening: "
                     <> display (tshow exc)
             Right _ -> pure ()
 
+haduiServeHttp
+    :: HasLogFunc env => HaduiConfig -> FilePath -> FilePath -> RIO env ()
+haduiServeHttp cfg prjRoot resRoot = do
+    env <- ask
 
-
-    -- continue to serve http in main thread
     let httpCfg =
             Snap.setBind (encodeUtf8 $ bindInterface cfg)
                 $ Snap.setPort (httpPort cfg)
@@ -312,15 +323,18 @@ haduiPubServer = do
                 $ Snap.setErrorLog (Snap.ConfigIoLog logHttpError) mempty
         logHttpError msgBytes = case decodeUtf8' msgBytes of
             Left  exc -> error $ "hadui unexpected encoding error: " ++ show exc
-            Right msg -> runUIO uio $ logError $ display msg
-        httpListening httpInfo = runUIO uio $ do
-            listenAddrs <- liftIO
-                $ sequence (getSocketName <$> Snap.getStartupSockets httpInfo)
-            logInfo $ "hadui available at: " <> (display . T.unwords)
-                (("http://" <>) . tshow <$> listenAddrs)
+            Right msg -> runRIO env $ logError $ display msg
+        httpListening httpInfo = do
+            listenAddrs <- sequence
+                (getSocketName <$> Snap.getStartupSockets httpInfo)
+            runRIO env
+                $  logInfo
+                $  "hadui available at: "
+                <> (display . T.unwords)
+                       (("http://" <>) . tshow <$> listenAddrs)
 
         dirServCfg   = Snap.fancyDirectoryConfig
-        prjResRoot   = haduiProjectRoot uio </> "hadui"
+        prjResRoot   = prjRoot </> "hadui"
         prjFrontFile = prjResRoot </> "front.html"
         !wsPortBytes = encodeUtf8 $ tshow $ wsPort cfg
 
@@ -333,17 +347,25 @@ haduiPubServer = do
                 ""
                 (liftIO (D.doesFileExist prjFrontFile) >>= \case
                     True  -> Snap.serveFile prjFrontFile
-                    False -> Snap.serveFile (haduiResRoot </> "front.html")
+                    False -> Snap.serveFile (resRoot </> "front.html")
                 )
         -- other static files
         <|> Snap.serveDirectoryWith dirServCfg prjResRoot
-        <|> Snap.serveDirectoryWith dirServCfg haduiResRoot
+        <|> Snap.serveDirectoryWith dirServCfg resRoot
 
 
-websocketFromFD :: Int -> IO WS.Connection
-websocketFromFD fd = do
-    sock  <- mkSocket (fromIntegral fd)
-    pconn <- WS.makePendingConnection sock
-        $ WS.defaultConnectionOptions { WS.connectionStrictUnicode = True }
-    WS.acceptRequest pconn
+haduiDevServer :: Int -> GHC.Ghc ()
+haduiDevServer wsfd = do
+    uio <- initUIO
+
+    liftIO $ do
+        sock  <- mkSocket (fromIntegral wsfd)
+        pconn <- WS.makePendingConnection sock
+            $ WS.defaultConnectionOptions { WS.connectionStrictUnicode = True }
+        wsc <- WS.acceptRequest pconn
+        runUIO uio
+            $  logDebug
+            $  "hadui development mode serving wsfd: "
+            <> display (tshow wsfd)
+        haduiServeWS uio wsc
 
