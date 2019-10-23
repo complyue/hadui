@@ -65,7 +65,7 @@ data UserInterfaceOutput = UserInterfaceOutput {
     -- If a UIO action starts concurrent compution threads, and such
     -- a thread shall comm back to its originating ws, it must save
     -- the contextual websocket in GIL atm it's started.
-    , haduiGIL :: !(MVar (Maybe WS.Connection))
+    , haduiGIL :: !(MVar  WS.Connection)
 
     -- | the underlying log function to implement rio's HasLogFunc
     , haduiBackendLogFunc :: !LogFunc
@@ -108,7 +108,7 @@ initUIO = do
     uio        <- liftIO $ do
         (stackPrjRoot, cfg) <- loadHaduiConfig
         appData             <- newMVar Nothing
-        gil                 <- newMVar Nothing
+        gil                 <- newEmptyMVar
         lo                  <- haduiBackendLogOpts cfg
         -- may need to teardown 'lf' on process exit, once the log target
         -- needs that, not needed as far as we only log to stderr.
@@ -132,15 +132,16 @@ initUIO = do
     return uio
 
 
--- | Execute a UIO action with the specified ws for current context
+-- | Execute a UIO action with the specified ws for current context.
+--
+-- Note this is designed to be called from forked threads by wsc actions.
+-- The wsc argument to use here is normally captured from 'haduiGIL' atm
+-- the calling thread is started.
+--
+-- NEVER call this from threads directly triggered by UI, or it's deadlock.
 withHaduiFront :: WS.Connection -> UIO a -> UIO a
 withHaduiFront wsc action = do
     uio <- ask
     let gil = haduiGIL uio
-    liftIO $ bracket (swapMVar gil $ Just wsc) (swapMVar gil) $ \wscReplaced ->
-        do
-            case wscReplaced of
-                Nothing        -> pure ()
-                Just _wscBogon -> error "hadui wsc nested in gil ?!"
+    liftIO $ putMVar gil wsc >> runUIO uio action `finally` takeMVar gil
 
-            runUIO uio action

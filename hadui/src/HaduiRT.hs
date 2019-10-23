@@ -78,16 +78,21 @@ import qualified Paths_hadui                   as Meta
 uiComm :: A.ToJSON a => a -> UIO ()
 uiComm jsonCmd = do
     uio <- ask
-    let txtPayload = A.encode jsonCmd
+    let gil        = haduiGIL uio
+        txtPayload = A.encode jsonCmd
         txtPacket  = WS.Text txtPayload Nothing
-    liftIO $ withMVar (haduiGIL uio) $ \case
-        Nothing ->
-            runUIO uio
+    liftIO $ do
+        noWSC <- isEmptyMVar gil
+        if noWSC
+            then
+                runUIO uio
                 $  logError
                 $  display
                 $  "No ws in context for comm of: "
                 <> (Utf8Builder $ SB.lazyByteString txtPayload)
-        Just wsc -> WS.sendDataMessage wsc txtPacket
+            else do
+                wsc <- readMVar gil
+                WS.sendDataMessage wsc txtPacket
     return ()
 
 
