@@ -97,9 +97,11 @@ stack build --exec hadui-dev
 
   - the [Rating.hs module](https://github.com/complyue/hadui-demo/blob/master/demo/src/Rating.hs)
     is paired with [rating.html page](https://github.com/complyue/hadui-demo/blob/master/hadui/rating.html) to use state in frontend only.
+    ![hadui-rating](https://user-images.githubusercontent.com/15646573/67356754-cc66e500-f58d-11e9-9360-f7d7b2ca67c0.png)
 
   - the [StatefulRating.hs module](https://github.com/complyue/hadui-demo/blob/master/demo/src/StatefulRating.hs)
     is paired with [stateful-rating.html page](https://github.com/complyue/hadui-demo/blob/master/hadui/stateful-rating.html) to use state in backend.
+    ![hadui-stateful-rating](https://user-images.githubusercontent.com/15646573/67356755-ccff7b80-f58d-11e9-9e0c-c55ae601200c.png)
 
   - the [updateRank js method](https://github.com/complyue/hadui-demo/blob/master/hadui/hadui-custom.js#L41) is shared by above 2 examples to update UI from Haskell code.
 
