@@ -183,7 +183,7 @@ haduiExecStmt stmt = do
                         <> "\n"
                         <> "--- while exec stmt:\n"
                         <> stmt
-                        <> "==="
+                        <> "\n==="
                     uiLog $ DetailedErrorMsg "runtime error" errDetails
                 Right _ -> pure ()
             -- todo handle breakpoint hit ?
@@ -254,11 +254,6 @@ haduiPubServer = do
             $  "hadui publishing project at ["
             <> fromString (haduiProjectRoot uio)
             <> "]"
-        logDebug $ "hadui with-ghc: \n  " <> display (withGHC cfg)
-        logDebug $ "hadui ghci-options: \n" <> display
-            (T.unlines $ ("  " <>) <$> ghciOptions cfg)
-        logDebug $ "hadui ghc-options: \n" <> display
-            (T.unlines $ ("  " <>) <$> ghcOptions cfg)
 
     -- serve websockets in background threads
     runRIO uio $ haduiListenWSC cfg close $ \conn -> do

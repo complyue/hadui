@@ -19,6 +19,7 @@ module HaduiCfg
     ( HaduiConfig(..)
     , loadHaduiConfig
     , haduiBackendLogOpts
+    , haduiGHCiCmdl
     )
 where
 
@@ -45,12 +46,11 @@ loadHaduiConfig =
                         haduiYamlFile = stackPrjRoot </> "hadui.yaml"
                     in  D.doesFileExist haduiYamlFile
                             >>= \case
-                                    True -> withBinaryFile
-                                        haduiYamlFile
-                                        ReadMode
-                                        \h -> do -- TODO can this be point-free ?
-                                            bytes <- BL.hGetContents h
-                                            return $! decode1 bytes
+                                    True ->
+                                        withBinaryFile haduiYamlFile ReadMode
+                                            $ \h -> do -- TODO can this be point-free ?
+                                                  bytes <- BL.hGetContents h
+                                                  return $! decode1 bytes
                                         -- following won't work coz laziness
                                         -- (fmap decode1 . BL.hGetContents)
                                     -- parse empty dict for all defaults
@@ -71,6 +71,7 @@ data HaduiConfig = HaduiConfig {
     , withGHC :: Text
     , ghciOptions :: [Text]
     , ghcOptions :: [Text]
+    , stackOptions :: [Text]
     } deriving (Eq,Show )
 
 instance FromYAML HaduiConfig where
@@ -97,6 +98,9 @@ instance FromYAML HaduiConfig where
             <*> v
             .:? "ghc-options"
             .!= []
+            <*> v
+            .:? "stack-options"
+            .!= []
 
 
 haduiBackendLogOpts :: HaduiConfig -> IO LogOptions
@@ -109,4 +113,58 @@ haduiBackendLogOpts cfg = do
         verbose = ll < LevelWarn -- go verbose since info level
     lo <- logOptionsHandle stderr verbose
     return $ setLogMinLevel ll lo
+
+
+haduiGHCiCmdl :: HaduiConfig -> String -> [String] -> [String]
+haduiGHCiCmdl cfg fePluginName feArgs =
+    -- the cmdl allowing copy&paste to bash prompt
+    --                                     trace
+    -- (  "# --- begin hadui cmdl ---\n"
+    -- <> T.pack (unwords [ "'" <> o <> "'" | o <- cmdl ])
+    -- <> "\n# === end hadui cmdl ==="
+    -- )
+                                        cmdl  where
+    !ghcExecutable = T.unpack $ withGHC cfg
+    !cmdl =
+        ["stack", "ghci"]
+            ++ (T.unpack <$> stackOptions cfg)
+            ++ [
+
+-- TODO stack will ask through the tty if multiple executables
+-- are defined in the project, hadui won't play well in this
+-- case. file an issue with stack, maybe introduce a new cmdl
+-- option to load all library modules with no question asked.
+
+-- use designated GHC
+                 "--with-ghc"
+               , ghcExecutable
+
+-- use UIO which reexports RIO as prelude
+               , "--ghc-options"
+               , "-XNoImplicitPrelude"
+
+-- really hope that Haskell the language unify the string
+-- types (with utf8 seems the norm) sooner than later
+               , "--ghc-options"
+               , "-XOverloadedStrings"
+
+-- to allow literal Text/Int without explicit type anno
+               , "--ghc-options"
+               , "-XExtendedDefaultRules"
+
+-- the frontend trigger
+               , "--ghci-options"
+               , "-e \":frontend " ++ fePluginName ++ "\""
+               ]
+            ++ concat
+                   (  [ ["--ghci-options", "-ffrontend-opt " ++ fea]
+                      | fea <- feArgs
+                      ]
+                   ++ [ ["--ghci-options", T.unpack opt]
+                      | opt <- ghciOptions cfg
+                      ]
+                   ++ [ ["--ghc-options", T.unpack opt]
+                      | opt <- ghcOptions cfg
+                      ]
+                   )
 

@@ -68,17 +68,8 @@ runDevServer haduiResRoot = do
         $  "hadui developing project at ["
         <> fromString (haduiProjectRoot devs)
         <> "]"
-    logDebug $ "hadui with-ghc: \n  " <> display (withGHC cfg)
-    logDebug $ "hadui ghci-options: \n" <> display
-        (T.unlines $ ("  " <>) <$> ghciOptions cfg)
-    logDebug $ "hadui ghc-options: \n" <> display
-        (T.unlines $ ("  " <>) <$> ghcOptions cfg)
 
-    let !ghcExecutable = T.unpack $ withGHC cfg
-        !extraOpts     = RIO.concat
-            (  [ ["--ghci-options", show opt] | opt <- ghciOptions cfg ]
-            ++ [ ["--ghc-options", show opt] | opt <- ghcOptions cfg ]
-            )
+    let
         upstartHandler conn = do
             wsfd <- unsafeFdSocket conn
 
@@ -89,37 +80,7 @@ runDevServer haduiResRoot = do
             pid <- forkProcess $ executeFile
                 "/usr/bin/env"
                 False
-                (  [ "stack"
-                   , "ghci"
-
-                    -- TODO stack will ask through the tty if multiple executables
-                    -- are defined in the project, hadui won't play well in this
-                    -- case. file an issue with stack, maybe introduce a new cmdl
-                    -- option to load all library modules with no question asked.
-
-                    -- use designated GHC
-                   , "--with-ghc"
-                   , ghcExecutable
-
-                    -- use UIO which reexports RIO as prelude
-                   , "--ghc-options"
-                   , "-XNoImplicitPrelude"
-
-                    -- really hope that Haskell the language unify the string
-                    -- types (with utf8 seems the norm) sooner than later
-                   , "--ghc-options"
-                   , "-XOverloadedStrings"
-
-                    -- to allow literal Text/Int without explicit type anno
-                   , "--ghc-options"
-                   , "-XExtendedDefaultRules"
-
-                    -- the frontend trigger
-                   , "--ghci-options"
-                   , "-e \":frontend HaduiDev\" -ffrontend-opt " ++ show wsfd
-                   ]
-                ++ extraOpts -- opts from hadui.yaml
-                )
+                (haduiGHCiCmdl cfg "HaduiDev" [show wsfd])
                 Nothing
 
             runRIO devs
