@@ -30,6 +30,7 @@ import           HaduiMonad
 import           HaduiRT
 
 
+-- | 'print' is just shorthand for 'uiLog . TextMsg . textDisplay'
 print :: Display a => a -> UIO ()
-print v = uiLog $ TextMsg $ textDisplay v
+print = uiLog . TextMsg . textDisplay
 
