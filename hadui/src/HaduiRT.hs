@@ -37,6 +37,8 @@ import qualified RIO.Text                      as T
 import qualified RIO.Text.Lazy                 as TL
 import           RIO.FilePath
 
+import           System.Posix.Process
+
 import qualified Data.ByteString.Builder       as SB
 
 import qualified GHC
@@ -78,9 +80,10 @@ import qualified Paths_hadui                   as Meta
 uiComm :: A.ToJSON a => a -> UIO ()
 uiComm jsonCmd = do
     uio <- ask
-    let gil        = haduiGIL uio
-        txtPayload = A.encode jsonCmd
-        txtPacket  = WS.Text txtPayload Nothing
+    let gil         = haduiGIL uio
+-- aeson will crash the process if 'txtPayload' is lazy here
+        !txtPayload = A.encode jsonCmd
+        txtPacket   = WS.Text txtPayload Nothing
     liftIO $ do
         noWSC <- isEmptyMVar gil
         if noWSC
@@ -150,23 +153,41 @@ haduiExecGhc ghcAction = do
                     (GHC.pprErrMsgBagWithLoc $ GHC.srcErrorMessages err)
             runUIO uio $ uiLog $ DetailedErrorMsg "Source error: " errDetails
     liftIO
-        $ (flip GHC.reflectGhc) ghcSession
+        $ flip GHC.reflectGhc ghcSession
         $ GHC.handleGhcException logGhcExc
         $ GHC.handleSourceError logSrcError --
                                 ghcAction
 
 haduiExecStmt :: Text -> UIO ()
-haduiExecStmt stmt = haduiExecGhc $ do
-    -- have 'GHC.execLineNumber' start from 0 so line numbers in error
-    -- report will match original source.
-    _execResult <- GHC.execStmt
-        ("mustUIO $\n"  -- hint required type with this line prepended
-                       ++ T.unpack stmt)
-        GHC.execOptions { GHC.execSourceFile = "<hadui-adhoc>"
-                        , GHC.execLineNumber = 0
-                        }
-    -- todo say sth about the result to front UI ?
-    return ()
+haduiExecStmt stmt = do
+    uio <- ask
+    haduiExecGhc $ do
+        -- force the result to have it thoroughly executed
+        !execResult <- GHC.execStmt
+            ("mustUIO $\n"  -- hint required type with this line prepended
+                           ++ T.unpack stmt)
+            GHC.execOptions { GHC.execSourceFile = "<hadui-adhoc>"
+            -- have 'GHC.execLineNumber' start from 0 so line numbers in error
+            -- report will match original source.
+                            , GHC.execLineNumber = 0
+                            }
+        -- log some in case of error
+        case execResult of
+            GHC.ExecComplete xResult _xAlloc -> case xResult of
+                Left exc -> runUIO uio $ do
+                    let !errDetails = tshow exc
+                    logWarn
+                        $  display
+                        $  "hadui runtime error\n===\n"
+                        <> errDetails
+                        <> "\n"
+                        <> "--- while exec stmt:\n"
+                        <> stmt
+                        <> "==="
+                    uiLog $ DetailedErrorMsg "runtime error" errDetails
+                Right _ -> pure ()
+            -- todo handle breakpoint hit ?
+            GHC.ExecBreak _ _ -> pure ()
 
 
 -- serve a ws until it's disconnected
@@ -176,7 +197,7 @@ haduiServeWS uio wsc = do
         "hadui ready for stack project at: "
         (T.pack $ haduiProjectRoot uio)
     let
-        servOnePkt = do
+        keepServingPkt = do
             pkt <- WS.receiveDataMessage wsc
             case pkt of
                 (WS.Text _bytes (Just pktText)) ->
@@ -194,8 +215,8 @@ haduiServeWS uio wsc = do
                     WS.sendCloseCode wsc 1003 ("?!?" :: Text)
             -- anyway we should continue receiving, even after close request sent, 
             -- we are expected to process a CloseRequest ctrl message from peer.
-            servOnePkt
-    catch servOnePkt $ \case
+            keepServingPkt
+    keepServingPkt `catch` \case
         WS.CloseRequest closeCode closeReason
             | closeCode == 1000 || closeCode == 1001 -> runUIO uio
             $ logDebug "hadui ws closed normally."
@@ -307,11 +328,12 @@ haduiListenWSC cfg wscDisposer wscHandler = do
             (Just $ T.unpack $ bindInterface cfg)
             (Just $ show $ wsPort cfg)
         for_ addrs $ \addr -> forkFinally (listenWS addr) $ \case
-            Left exc ->
+            Left exc -> do
                 runRIO env
                     $  logError
                     $  "hadui failed with ws listening: "
                     <> display (tshow exc)
+                exitImmediately $ ExitFailure 5
             Right _ -> pure ()
 
 haduiServeHttp

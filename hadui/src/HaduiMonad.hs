@@ -74,6 +74,15 @@ data UserInterfaceOutput = UserInterfaceOutput {
     , haduiGhcSession :: !GHC.Session
     }
 
+instance MonadUnliftIO UIO where
+    askUnliftIO = UIO $ ReaderT $ \r ->
+        withUnliftIO $ \u ->
+            return (UnliftIO (unliftIO u . flip runReaderT r . unUIO))
+
+instance PrimMonad UIO where
+    type PrimState UIO = PrimState IO
+    primitive = UIO . ReaderT . const . primitive
+
 instance HasLogFunc UserInterfaceOutput where
     logFuncL = lens haduiBackendLogFunc (\x y -> x { haduiBackendLogFunc = y })
 
@@ -88,11 +97,10 @@ runUIO uio (UIO (ReaderT f)) = liftIO (f uio)
 --
 -- This very explicitly hints the expected monad type in the dynamic
 -- compilation of such statements.
-mustUIO :: NFData a => UIO a -> IO ()
+mustUIO :: UIO a -> IO ()
 mustUIO m = do
     uio <- readIORef _globalUIO
-    v   <- runUIO uio m
-    _   <- pure $!! v -- force it to be evaluated
+    !_v <- runUIO uio m -- force it to be evaluated
     pure ()
 
 
@@ -143,5 +151,5 @@ withHaduiFront :: WS.Connection -> UIO a -> UIO a
 withHaduiFront wsc action = do
     uio <- ask
     let gil = haduiGIL uio
-    liftIO $ putMVar gil wsc >> runUIO uio action `finally` takeMVar gil
+    bracket_ (liftIO $ putMVar gil wsc) (liftIO $ takeMVar gil) action
 
