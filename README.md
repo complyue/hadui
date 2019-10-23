@@ -1,10 +1,31 @@
 # Web front UI for interactive stack projects
 
-## Platform Supports
+## Orientation
 
-- macOS - mainly used on Mojave
-- Linux - mainly used on Ubuntu 18.04
+hadui is data science oriented,
+it is not suitable as a general purpose web framework.
+
+all exported functions from all modules in the stack project of matter,
+are exposed to frontend in a flat space. this is ideal to support analytical
+workflows, but overly open or even prohibitive to support business workflows.
+
+## Platform Support
+
+- macOS - regularly used on Mojave
+- Linux - regularly used on Ubuntu 18.04
 - Windows - should work in Docker in theory, not attempted yet
+
+### GHC
+
+currently you have to be comfortable to compile yourself an experimental version of
+[GHC 8.6.5 with `:frontend` cmd](https://gitlab.haskell.org/complyue/ghc/tree/ghc-8.6-ife)
+to start using hadui.
+
+do [this trick](https://gitlab.haskell.org/ghc/ghc/issues/17348#note_228587)
+to incorporate it into your stack's GHC installation.
+
+the mod to GHC is very light, should be no difficulty to migrate to other GHC versions,
+but as time being, not attempted yet. a MR to GHC is thought of but not carried out yet.
 
 ## Quick Start
 
