@@ -134,5 +134,5 @@ cd hadui-demo
 stack build --exec hadui
 ```
 
-![hadui-demo-2-fe](https://user-images.githubusercontent.com/15646573/67268165-6410f880-f4e6-11e9-861e-ed779493d6af.png)
-![hadui-demo-2-be](https://user-images.githubusercontent.com/15646573/67268163-63786200-f4e6-11e9-86bc-6820a1314477.png)
+![hadui-demo-fe](https://user-images.githubusercontent.com/15646573/67366682-88340e80-f5a6-11e9-94b7-ed6c66cf428e.png)
+![hadui-demo-be](https://user-images.githubusercontent.com/15646573/67366681-88340e80-f5a6-11e9-99ea-a74e6ec54144.png)
