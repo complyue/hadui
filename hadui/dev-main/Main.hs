@@ -70,7 +70,10 @@ runDevServer haduiResRoot = do
 
     let
         upstartHandler conn = do
-            wsfd <- unsafeFdSocket conn
+            -- this works with network-2.x
+            let wsfd = fdSocket conn
+            -- following works with network-3.x
+            -- wsfd <- unsafeFdSocket conn
 
             -- clear FD_CLOEXEC flag so it can be passed to subprocess
             setFdOption (Fd wsfd) CloseOnExec False
@@ -125,7 +128,11 @@ runDevServer haduiResRoot = do
 
     -- serve websockets in background threads
     let closeFdInParent conn = do
-            wsfd <- unsafeFdSocket conn
+            -- this works with network-2.x
+            let wsfd = fdSocket conn
+            -- following works with network-3.x
+            -- wsfd <- unsafeFdSocket conn
+
             -- always close the fd of socket in parent process, the socket
             -- will be shutdown when no fd kept open on it.
             -- the subprocess will hold the inherited fd open until it exits,

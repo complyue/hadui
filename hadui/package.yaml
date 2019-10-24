@@ -22,7 +22,8 @@ dependencies:
   - ghc >= 8.6
   - unix
   - process
-  - network >= 3.0
+  - network
+  - websockets
 
   - base
   - rio
@@ -33,7 +34,6 @@ dependencies:
   - aeson
   - aeson-qq
   - unliftio
-  - websockets
   - snap-core
   - snap-server
 

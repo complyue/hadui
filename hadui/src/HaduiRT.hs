@@ -285,7 +285,10 @@ haduiListenWSC cfg wscDisposer wscHandler = do
                     close
                 $ \listeningSock -> do
                     -- close-on-exec for this listening socket
-                      withFdSocket listeningSock setCloseOnExecIfNeeded
+                    -- this works with network-2.0
+                      setCloseOnExecIfNeeded $ fdSocket listeningSock
+                    -- following works with network-3.x
+                    --  withFdSocket listeningSock setCloseOnExecIfNeeded
 
                     -- TODO on Ubuntu 18.04, it may fail even port
                     --      not really in use without reuse addr,
@@ -379,11 +382,18 @@ haduiServeHttp cfg prjRoot resRoot = do
 haduiDevServer :: Int -> GHC.Ghc ()
 haduiDevServer wsfd = do
     uio <- initUIO
+    let wsfd' = fromIntegral wsfd
 
     liftIO $ do
-        sock  <- mkSocket (fromIntegral wsfd)
-        pconn <- WS.makePendingConnection sock
-            $ WS.defaultConnectionOptions { WS.connectionStrictUnicode = True }
+        setNonBlockIfNeeded wsfd'
+        -- XXX it's not trivial to decied the fd is AF_INET or AF_INET6 here,
+        -- but we wont't have to with network-3.x, mkSocket will take only fd.
+        -- as far as lts stays with network-2.8, we blindly assume it's IPv4,
+        -- won't fix this if anyone suffers using IPv6 for hadui.
+        sock  <- mkSocket wsfd' AF_INET Stream defaultProtocol Connected
+        pconn <- WS.makePendingConnection sock $ WS.defaultConnectionOptions
+            { WS.connectionStrictUnicode = True
+            }
         wsc <- WS.acceptRequest pconn
         runUIO uio
             $  logDebug
