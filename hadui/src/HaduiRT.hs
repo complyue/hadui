@@ -14,6 +14,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE ParallelListComp #-}
 
 -- | hadui runtime
 module HaduiRT
@@ -45,8 +46,8 @@ import qualified GHC
 import qualified HscTypes                      as GHC
 import qualified ErrUtils                      as GHC
 import qualified Panic                         as GHC
+import qualified Outputable                    as GHC
 import qualified GhcMonad                      as GHC
-import qualified GhcPlugins                    as GHC
 
 import qualified System.Directory              as D
 import           UnliftIO.Concurrent
@@ -166,28 +167,72 @@ haduiExecStmt stmt = do
         !execResult <- GHC.execStmt
             ("mustUIO $\n"  -- hint required type with this line prepended
                            ++ T.unpack stmt)
-            GHC.execOptions { GHC.execSourceFile = "<hadui-adhoc>"
+
+            -- XXX RunAndLogSteps ~= :trace
+            GHC.execOptions { GHC.execSingleStep = GHC.RunAndLogSteps
+                            , GHC.execSourceFile = "<hadui-adhoc>"
             -- have 'GHC.execLineNumber' start from 0 so line numbers in error
             -- report will match original source.
                             , GHC.execLineNumber = 0
                             }
-        -- log some in case of error
         case execResult of
             GHC.ExecComplete xResult _xAlloc -> case xResult of
                 Left exc -> runUIO uio $ do
+                    -- log error for debuggability
                     let !errDetails = tshow exc
                     logWarn
                         $  display
-                        $  "hadui runtime error\n===\n"
+                        $  "runtime error\n===\n"
                         <> errDetails
-                        <> "\n"
-                        <> "--- while exec stmt:\n"
+                        <> "\n--- while exec stmt:\n"
                         <> stmt
-                        <> "\n==="
+                        <> "\n===runtime error"
                     uiLog $ DetailedErrorMsg "runtime error" errDetails
                 Right _ -> pure ()
-            -- todo handle breakpoint hit ?
-            GHC.ExecBreak _ _ -> pure ()
+            GHC.ExecBreak brkNames _mbBrkInf -> do
+                -- pretty print traced history, on uncaught exception
+                -- dynFlags <- GHC.getInteractiveDynFlags
+                -- let !pprStyle = GHC.mkErrStyle dynFlags GHC.alwaysQualify
+                --     !brkDetails =
+                --         T.pack $ unlines
+                --             [ show (GHC.nameSrcSpan n) | n <- brkNames ]
+
+
+
+                resumes    <- GHC.getResumeContext
+                brkDetails <- case resumes of
+                    []      -> return "Not stopped at a breakpoint"
+                    (r : _) -> do
+                        let hist = GHC.resumeHistory r
+                            took = hist
+                        case hist of
+                            [] ->
+                                return
+                                    "Empty history. Perhaps you forgot to use :trace?\n"
+                            _ -> do
+                                pans <- mapM GHC.getHistorySpan took
+                                let names = map GHC.historyEnclosingDecls took
+                                return $ T.unlines
+                                    [ T.pack (unwords name)
+                                      <> " - "
+                                      <> tshow pan
+                                    | name <-  names | pan <- pans
+                                    ]
+
+
+
+                runUIO uio $ do
+                    logWarn
+                        $  display
+                        $  "error traced\n===\n"
+                        <> brkDetails
+                        <> "--- while exec stmt:\n"
+                        <> stmt
+                        <> "\n===error traced"
+                    uiLog $ DetailedErrorMsg "error traced" brkDetails
+                -- todo consider resumption ?
+                _ <- GHC.abandonAll
+                pure ()
 
 
 -- serve a ws until it's disconnected
