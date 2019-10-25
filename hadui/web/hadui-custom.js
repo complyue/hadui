@@ -9,7 +9,7 @@ export const HaduiDefaultStmt =
   `
 {- put and execute interactive Haskell statement here.
 you have the same artifacts in scope as \`stack ghci\`,
-with the \`RIO\` module implicitly imported in addition,
+with the \`UIO\` module implicitly imported in addition,
 so you get \`print\`, \`uiLog\` etc. -}
 print "Hello, web front!"
 `.trim();

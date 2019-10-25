@@ -33,7 +33,6 @@ import           Data.Dynamic                   ( Dynamic(..) )
 
 import qualified GHC
 import qualified GhcMonad                      as GHC
-import qualified DynFlags                      as GHC
 
 import qualified Network.WebSockets            as WS
 
@@ -135,15 +134,17 @@ initUIO = do
         >>= GHC.setContext
         .   ((GHC.IIDecl $ GHC.simpleImportDecl $ GHC.mkModuleName "UIO") :)
     -- to allow string and number literals without explicit type anno
-    _        <- GHC.runDecls "default (Text,Int)"
+    _ <- GHC.runDecls "default (Text,Int)"
 
+    -- XXX this does not work, have to use -fbreak-on-error on launching cmdl
+    --
     -- break on error/exception to print error location for debuggability
-    dynFlags <- GHC.getSessionDynFlags
-    let dynFlags' = dynFlags & GHC.setGeneralFlag' GHC.Opt_BreakOnError
-                -- stop only on uncaught exceptions with mere above,
-                -- following enables stop on any exception:
-                -- . GHC.setGeneralFlag' GHC.Opt_BreakOnException
-    _ <- GHC.setSessionDynFlags dynFlags'
+    -- dynFlags <- GHC.getSessionDynFlags
+    -- let dynFlags' = dynFlags & GHC.setGeneralFlag' GHC.Opt_BreakOnError
+    --             -- stop only on uncaught exceptions with mere above,
+    --             -- following enables stop on any exception:
+    --             -- . GHC.setGeneralFlag' GHC.Opt_BreakOnException
+    -- _ <- GHC.setSessionDynFlags dynFlags'
 
     liftIO $ writeIORef _globalUIO uio
     return uio

@@ -91,7 +91,7 @@ instance FromYAML HaduiConfig where
             .!= "INFO"
             <*> v
             .:? "with-ghc"
-            .!= "ghc-ife" -- TODO default to ghc once ':frontend' cmd is supported officially
+            .!= "ghc"
             <*> v
             .:? "ghci-options"
             .!= ["-fobject-code"]
@@ -151,6 +151,10 @@ haduiGHCiCmdl cfg fePluginName feArgs =
 -- to allow literal Text/Int without explicit type anno
                , "--ghc-options"
                , "-XExtendedDefaultRules"
+
+-- to stop on uncaught errors
+               , "--ghci-options"
+               , "-fbreak-on-error"
 
 -- the frontend trigger
                , "--ghci-options"

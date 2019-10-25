@@ -165,20 +165,61 @@ haduiExecStmt stmt = do
     haduiExecGhc $ do
         -- force the result to have it thoroughly executed
         !execResult <- GHC.execStmt
-            ("mustUIO $\n"  -- hint required type with this line prepended
+            ("mustUIO $\n" -- hint required type with this line prepended
                            ++ T.unpack stmt)
-
-            -- XXX RunAndLogSteps ~= :trace
-            GHC.execOptions { GHC.execSingleStep = GHC.RunAndLogSteps
+            -- have 'execLineNumber' start from 0 so line numbers in error
+            -- report will match original source
+            GHC.execOptions { GHC.execLineNumber = 0
                             , GHC.execSourceFile = "<hadui-adhoc>"
-            -- have 'GHC.execLineNumber' start from 0 so line numbers in error
-            -- report will match original source.
-                            , GHC.execLineNumber = 0
+
+                    -- XXX RunAndLogSteps ~= :trace
+                            , GHC.execSingleStep = GHC.RunAndLogSteps
+                    -- TODO if disabling TRACE can save us enough run time,
+                    -- show the option as a checkbox besides [CRUNCH!] btn.
                             }
+
         case execResult of
+            GHC.ExecBreak _brkNames _mbBrkInf -> do
+                -- pretty print traced history, on uncaught exception
+                dynFlags   <- GHC.getInteractiveDynFlags
+                resumes    <- GHC.getResumeContext
+                brkDetails <- case resumes of
+                    []      -> return "Not stopped at a breakpoint\n"
+                    (r : _) -> do
+                        let hist = GHC.resumeHistory r
+                            ppr =
+                                T.pack
+                                    . (GHC.showSDocDumpOneLine dynFlags)
+                                    . GHC.ppr
+                        if null hist
+                            then return "Empty history. TRACE not enabled?\n"
+                            else do
+                                pans <- mapM GHC.getHistorySpan hist
+                                let names = map GHC.historyEnclosingDecls hist
+                                return $ T.unlines
+                                    [ T.pack (unwords name)
+                                      <> " ("
+                                      <> ppr pan
+                                      <> ")"
+                                    | name <-  names | pan <- pans
+                                    ]
+                runUIO uio $ do
+                    logWarn
+                        $  display
+                        $  "uncaught error\n===\n"
+                        <> brkDetails
+                        <> "--- while exec stmt:\n"
+                        <> stmt
+                        <> "\n===uncaught error"
+                    uiLog $ DetailedErrorMsg "uncaught error" brkDetails
+
+                _ <- GHC.abandonAll -- todo consider resumption ?
+                pure ()
+
             GHC.ExecComplete xResult _xAlloc -> case xResult of
                 Left exc -> runUIO uio $ do
-                    -- log error for debuggability
+                    -- hadui is set to break-on-error, this should not happen,
+                    -- anyway log the unexpected error, just in case
                     let !errDetails = tshow exc
                     logWarn
                         $  display
@@ -188,51 +229,9 @@ haduiExecStmt stmt = do
                         <> stmt
                         <> "\n===runtime error"
                     uiLog $ DetailedErrorMsg "runtime error" errDetails
+
+                -- the normal case for vast majority
                 Right _ -> pure ()
-            GHC.ExecBreak brkNames _mbBrkInf -> do
-                -- pretty print traced history, on uncaught exception
-                -- dynFlags <- GHC.getInteractiveDynFlags
-                -- let !pprStyle = GHC.mkErrStyle dynFlags GHC.alwaysQualify
-                --     !brkDetails =
-                --         T.pack $ unlines
-                --             [ show (GHC.nameSrcSpan n) | n <- brkNames ]
-
-
-
-                resumes    <- GHC.getResumeContext
-                brkDetails <- case resumes of
-                    []      -> return "Not stopped at a breakpoint"
-                    (r : _) -> do
-                        let hist = GHC.resumeHistory r
-                            took = hist
-                        case hist of
-                            [] ->
-                                return
-                                    "Empty history. Perhaps you forgot to use :trace?\n"
-                            _ -> do
-                                pans <- mapM GHC.getHistorySpan took
-                                let names = map GHC.historyEnclosingDecls took
-                                return $ T.unlines
-                                    [ T.pack (unwords name)
-                                      <> " - "
-                                      <> tshow pan
-                                    | name <-  names | pan <- pans
-                                    ]
-
-
-
-                runUIO uio $ do
-                    logWarn
-                        $  display
-                        $  "error traced\n===\n"
-                        <> brkDetails
-                        <> "--- while exec stmt:\n"
-                        <> stmt
-                        <> "\n===error traced"
-                    uiLog $ DetailedErrorMsg "error traced" brkDetails
-                -- todo consider resumption ?
-                _ <- GHC.abandonAll
-                pure ()
 
 
 -- serve a ws until it's disconnected
