@@ -43,6 +43,7 @@ import           System.Posix.Process
 import qualified Data.ByteString.Builder       as SB
 
 import qualified GHC
+import qualified Debugger                      as GHC
 import qualified HscTypes                      as GHC
 import qualified ErrUtils                      as GHC
 import qualified Panic                         as GHC
@@ -179,12 +180,21 @@ haduiExecStmt stmt = do
                             }
 
         case execResult of
-            GHC.ExecBreak _brkNames _mbBrkInf -> do
-                -- pretty print traced history, on uncaught exception
-                dynFlags   <- GHC.getInteractiveDynFlags
+            GHC.ExecBreak brkNames _mbBrkInf -> do
+                -- pretty print uncaught exception, and traced history
+                dynFlags <- GHC.getInteractiveDynFlags
+                errVars  <- catMaybes `liftM` mapM GHC.lookupName brkNames
+                errTerms <- mapM (GHC.obtainTermFromId maxBound True)
+                                 [ i | GHC.AnId i <- errVars ]
+                errDocs <- mapM GHC.showTerm errTerms
+                let
+                    errDesc =
+                        T.unwords
+                            $   (T.pack . GHC.showSDocDumpOneLine dynFlags)
+                            <$> errDocs
                 resumes    <- GHC.getResumeContext
-                brkDetails <- case resumes of
-                    []      -> return "Not stopped at a breakpoint\n"
+                errDetails <- case resumes of
+                    [] -> return "Not stopped at a breakpoint, how strange."
                     (r : _) -> do
                         let hist = GHC.resumeHistory r
                             ppr =
@@ -192,7 +202,11 @@ haduiExecStmt stmt = do
                                     . (GHC.showSDocDumpOneLine dynFlags)
                                     . GHC.ppr
                         if null hist
-                            then return "Empty history. TRACE not enabled?\n"
+                            then
+                                return
+                                    "Empty history. `-fobject-code` enabled?\n\
+                                    \Comment it out from `hadui.yaml`, run `stack purge`,\n\
+                                    \then restart hadui."
                             else do
                                 pans <- mapM GHC.getHistorySpan hist
                                 let names = map GHC.historyEnclosingDecls hist
@@ -206,12 +220,13 @@ haduiExecStmt stmt = do
                 runUIO uio $ do
                     logWarn
                         $  display
-                        $  "uncaught error\n===\n"
-                        <> brkDetails
+                        $  errDesc
+                        <> "\n===\n"
+                        <> errDetails
                         <> "--- while exec stmt:\n"
                         <> stmt
                         <> "\n===uncaught error"
-                    uiLog $ DetailedErrorMsg "uncaught error" brkDetails
+                    uiLog $ DetailedErrorMsg errDesc errDetails
 
                 _ <- GHC.abandonAll -- todo consider resumption ?
                 pure ()
