@@ -6,8 +6,9 @@ hadui is data science oriented,
 it is not suitable as a general purpose web framework.
 
 all exported functions from all modules in the stack project of matter,
-are exposed to frontend in a flat space. this is ideal to support analytical
-workflows, but overly open or even prohibitive to support business workflows.
+are exposed to frontend in a flat name space. this is ideal to support
+analytical workflows, but overly open or even prohibitive to support
+business workflows.
 
 ## Platform Support
 
@@ -15,17 +16,36 @@ workflows, but overly open or even prohibitive to support business workflows.
 - Linux - regularly used on Ubuntu 18.04
 - Windows - should work in Docker in theory, not attempted yet
 
-### GHC
+## Typical Usage
 
-currently you have to be comfortable to compile yourself an experimental version of
-[GHC 8.6.5 with `:frontend` cmd](https://gitlab.haskell.org/complyue/ghc/tree/ghc-8.6-ife)
-to start using hadui.
+Data analysts use a browser to submit scripts (in native Haskell, for
+parameters, simple job control etc.) to trigger number crunching in
+the backend (a single Haskell process or a swarm of computing nodes),
+and to see results plotted back to the browser - more windows opened
+to show [Bokeh](https://docs.bokeh.org) figures (this feature yet
+under construction).
 
-do [this trick](https://gitlab.haskell.org/ghc/ghc/issues/17348#note_228587)
-to incorporate it into your stack's GHC installation.
+![hadui-vscode-int-fe](https://user-images.githubusercontent.com/15646573/67581869-558f3f00-f77b-11e9-9e8a-c875a212c80b.png)
 
-the mod to GHC is very light, should be no difficulty to migrate to other GHC versions,
-but as time being, not attempted yet. a MR to GHC is thought of but not carried out yet.
+Programmers have `hadui-dev` as the default build tool run an ever going
+build task in their [HIE](https://github.com/haskell/haskell-ide-engine)
+enabled [VSCode](https://code.visualstudio.com) environment, to develop
+crunching code in stack projects.
+
+![hadui-vscode-int-be](https://user-images.githubusercontent.com/15646573/67583167-ab64e680-f77d-11e9-8574-4d71fd290a25.png)
+
+### GHC Stack
+
+hadui is geared to run upon the latest
+[ LTS Haskell supported by Stackage](https://www.stackage.org/lts)
+, while currently an experimental version of
+[GHC 8.6.5](https://gitlab.haskell.org/complyue/ghc/tree/ghc-8.6-ife)
+is necessarily used as the compiler.
+
+the mod to GHC is very light - simply added a `:frontend` cmd for GHCi mode,
+(pending issue at https://gitlab.haskell.org/ghc/ghc/issues/17348) it
+should be no difficulty to migrate to other GHC versions. so far an MR to
+GHC is thought of but not carried out yet.
 
 ## Quick Start
 
@@ -40,17 +60,36 @@ dependencies:
   - hadui
 ```
 
-- have `extra-deps` in your project's `stack.yaml` including:
+- in the project's `stack.yaml`, tell location of hadui within `extra-deps`,
+  and customize the compiler definition:
 
 ```yaml
 extra-deps:
+  # to use the version of hadui checked out locally
+  #- ../hadui/hadui
+
+  # to use a version of hadui from github
   - github: complyue/hadui
     commit: stable
     subdirs:
       - hadui
 
-  # need this line until network-3.x goes into lts
-  - network-3.1.1.0
+compiler-check: match-exact
+
+# CAVEATS
+#
+#   binary distributions referenced following have NO support, checkout:
+#
+# https://gitlab.haskell.org/complyue/ghc-ife-bindist/blob/master/README.md
+
+ghc-variant: ife
+
+setup-info:
+  ghc:
+    macosx-custom-ife:
+      8.6.5:
+        url: "https://gitlab.haskell.org/complyue/ghc-ife-bindist/raw/master/ghc-8.6.5-x86_64-apple-darwin.tar.xz"
+    # TODO linux bindist here
 ```
 
 - besides your `stack.yaml`, create `hadui.yaml`, like:
@@ -73,25 +112,22 @@ ws-port: 5051
 # backend log level
 log-level: DEBUG
 
-# need a GHC executable supports ':frontend <PluginModule>' command
-# see https://gitlab.haskell.org/ghc/ghc/issues/17348#note_228587
-with-ghc: ghc-ife
-
 # additional options passed to GHCi
 ghci-options:
-  # run project code compiled, instead of interpreted,
-  # for performance
-  - -fobject-code
+  # max history in trace, GHCi defaults to 50
+  - -fghci-hist-size=300
+
+  # run project code compiled, instead of interpreted, for performance
+  # but you won't get source locations for uncaught errors at runtime
+  #- -fobject-code
 
 # additional options passed to both GHC and GHCi
 ghc-options:
-  # language features to be used
-  - -XBlockArguments
-  - -XBangPatterns
-  - -XLambdaCase
-
-  # limit parallelism on a developer's machine
-  - -with-rtsopts=-maxN3
+  # language extensions to use, recommended by rio
+  #     https://github.com/commercialhaskell/rio/#language-extensions
+  - -XAutoDeriveTypeable
+  # ...
+  - -XViewPatterns
 ```
 
 - in your stack project, run:
@@ -125,6 +161,42 @@ stack build --exec hadui-dev
     ![hadui-stateful-rating](https://user-images.githubusercontent.com/15646573/67364543-55881700-f5a2-11e9-9499-10a488e2c818.png)
 
   - the [updateRank js method](https://github.com/complyue/hadui-demo/blob/master/hadui/hadui-custom.js#L41) is shared by above 2 examples to update UI from Haskell code.
+
+## VSCode Integration
+
+Setup your [VSCode](https://code.visualstudio.com) with
+[HIE](https://github.com/haskell/haskell-ide-engine)
+
+Create under the project root `.vscode/tasks.json` with following contents:
+
+```json
+{
+  "version": "2.0.0",
+  "presentation": {
+    "reveal": "always",
+    "panel": "new"
+  },
+  "tasks": [
+    {
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "label": "hadui-dev",
+      "type": "shell",
+      "command": "cd ${workspaceRoot}; stack build --exec hadui-dev"
+    }
+  ]
+}
+```
+
+Press `F7` (macOS) or `Ctrl+Shift+B` (Linux) to start `hadui-dev` for the project
+
+![hadui-vscode](https://user-images.githubusercontent.com/15646573/67378020-26c96b00-f5b9-11e9-9780-302db88ff50d.png)
+
+## Debugging with VSCode
+
+coming sooner than later ...
 
 ## Demo
 
