@@ -3,18 +3,43 @@
 ## Orientation
 
 hadui is data science oriented,
-it is not suitable as a general purpose web framework.
+It is not suitable as a general purpose web framework.
 
-all exported functions from all modules in the stack project of matter,
+All exported functions from all modules in the stack project of matter,
 are exposed to frontend in a flat name space. this is ideal to support
 analytical workflows, but overly open or even prohibitive to support
 business workflows.
 
-## Platform Support
+## Support (or lack thereof)
+
+Commercial support has not been planned, community is not formed yet,
+but hadui is an important part of my internal tool chain at work, it is:
 
 - macOS - regularly used on Mojave
 - Linux - regularly used on Ubuntu 18.04
 - Windows - should work in Docker in theory, not attempted yet
+
+### GHC and Stack
+
+hadui is geared to run upon the latest
+[LTS Haskell](https://www.stackage.org/lts)
+supported by Stackage, but currently an experimental version of
+[GHC 8.6.5](https://gitlab.haskell.org/complyue/ghc/tree/ghc-8.6-ife)
+is necessarily used as the compiler, while it can be automatically
+installed by `stack` for macOS and Linux on x64 hardware. You are
+encouraged to compile from source if on other platforms or the
+automatically installed bindist does not work for you.
+
+The mod to GHC is very light - simply added `:frontend` cmd to allow a
+[Frontend plugin](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/extending_ghc.html#frontend-plugins) be used with GHCi mode,
+(pending issue at https://gitlab.haskell.org/ghc/ghc/issues/17348) it
+should be no difficulty to migrate to other GHC versions. so far an MR to
+GHC is thought of but not carried out yet. Until the official stock
+release of GHC has it merged, I would be maintaining custom branches
+matching the GHC version chosen by latest
+[LTS Haskell](https://www.stackage.org/lts) which is `8.6.5` by
+[lts 14.11](https://www.stackage.org/lts-14.11)
+at time of speaking.
 
 ## Typical Usage
 
@@ -33,19 +58,6 @@ enabled [VSCode](https://code.visualstudio.com) environment, to develop
 crunching code in stack projects.
 
 ![hadui-vscode-int-be](https://user-images.githubusercontent.com/15646573/67583167-ab64e680-f77d-11e9-8574-4d71fd290a25.png)
-
-### GHC Stack
-
-hadui is geared to run upon the latest
-[ LTS Haskell supported by Stackage](https://www.stackage.org/lts)
-, while currently an experimental version of
-[GHC 8.6.5](https://gitlab.haskell.org/complyue/ghc/tree/ghc-8.6-ife)
-is necessarily used as the compiler.
-
-the mod to GHC is very light - simply added a `:frontend` cmd for GHCi mode,
-(pending issue at https://gitlab.haskell.org/ghc/ghc/issues/17348) it
-should be no difficulty to migrate to other GHC versions. so far an MR to
-GHC is thought of but not carried out yet.
 
 ## Quick Start
 
@@ -89,7 +101,9 @@ setup-info:
     macosx-custom-ife:
       8.6.5:
         url: "https://gitlab.haskell.org/complyue/ghc-ife-bindist/raw/master/ghc-8.6.5-x86_64-apple-darwin.tar.xz"
-    # TODO linux bindist here
+    linux64-custom-ife:
+      8.6.5:
+        url: "https://gitlab.haskell.org/complyue/ghc-ife-bindist/raw/master/ghc-8.6.5-x86_64-unknown-linux.tar.xz"
 ```
 
 - besides your `stack.yaml`, create `hadui.yaml`, like:

@@ -20,3 +20,6 @@ setup-info:
     macosx-custom-ife:
       8.6.5:
         url: "https://gitlab.haskell.org/complyue/ghc-ife-bindist/raw/master/ghc-8.6.5-x86_64-apple-darwin.tar.xz"
+    linux64-custom-ife:
+      8.6.5:
+        url: "https://gitlab.haskell.org/complyue/ghc-ife-bindist/raw/master/ghc-8.6.5-x86_64-unknown-linux.tar.xz"
