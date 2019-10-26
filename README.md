@@ -1,5 +1,7 @@
 # Web front UI for interactive stack projects
 
+[![Join the chat at https://gitter.im/hadui-web-front/community](https://badges.gitter.im/hadui-web-front/community.svg)](https://gitter.im/hadui-web-front/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 ## Orientation
 
 hadui is data science oriented,
