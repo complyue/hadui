@@ -4,11 +4,11 @@
 
 ## Orientation
 
-hadui is data science oriented,
-It is not suitable as a general purpose web framework.
+hadui is data science oriented, it is not suitable as a general purpose
+web framework.
 
 All exported functions from all modules in the stack project of matter,
-are exposed to frontend in a flat name space. this is ideal to support
+are exposed to frontend in a flat name space. This is ideal to support
 analytical workflows, but overly open or even prohibitive to support
 business workflows.
 
@@ -43,7 +43,15 @@ matching the GHC version chosen by latest
 [lts 14.11](https://www.stackage.org/lts-14.11)
 at time of speaking.
 
-## Typical Usage
+## (My) Typical Usage
+
+> I believe hadui can be useful in more ways for you and others, e.g.
+> a version of [CodeWorld](https://code.world) capable to leverage
+> the computing power of a computing center on the cloud.
+>
+> (I had been faithful to use CodeWorld as frontend for my team, only
+> to find out it runs the program by the browser, i.e. all in frontend,
+> no backend. So comes hadui)
 
 Data analysts use a browser to submit scripts (in native Haskell, for
 parameters, simple job control etc.) to trigger number crunching in
@@ -102,7 +110,7 @@ setup-info:
   ghc:
     macosx-custom-ife:
       8.6.5:
-        url: "https://gitlab.haskell.org/complyue/ghc-ife-bindist/raw/master/ghc-8.6.5-x86_64-apple-darwin.tar.xz"
+        url: "https://gitlab.haskell.org/complyue/ghc-ife-bindist/raw/master/ghc-8.6.5-x86_64-apple-darwin.tar.gz2"
     linux64-custom-ife:
       8.6.5:
         url: "https://gitlab.haskell.org/complyue/ghc-ife-bindist/raw/master/ghc-8.6.5-x86_64-unknown-linux.tar.xz"
