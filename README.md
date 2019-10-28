@@ -69,6 +69,39 @@ crunching code in stack projects.
 
 ![hadui-vscode-int-be](https://user-images.githubusercontent.com/15646573/67583167-ab64e680-f77d-11e9-8574-4d71fd290a25.png)
 
+## The UIO monad/module from package hadui
+
+Haskell code from hadui UI runs in the `UIO` monad. It's pretty much the
+same as `RIO` from the [rio](https://github.com/commercialhaskell/rio)
+library, with few addons like `print`/`uiLog`, and concrete `env` of type
+`UserInterfaceOutput`. It is essentially `ReaderT UserInterfaceOutput IO`,
+so you can do (un)lifting within it however you need.
+
+```haskell
+-- | The monad for User Interface Output
+-- UIO is output only, conversely to IO (which stands for Input/Output),
+-- user inputs shall be facilitated with a registry of 'MVar's,
+-- those get filled with 'IoC' from UI widgets.
+newtype UIO a = UIO { unUIO :: ReaderT UserInterfaceOutput IO a }
+    deriving (Functor, Applicative, Monad, MonadIO,
+        MonadReader UserInterfaceOutput, MonadThrow)
+```
+
+After all your code in the stack project has no necessarity to do with `UIO` at all,
+[print :: Display a => a -> UIO ()](https://github.com/complyue/hadui/blob/stable/hadui/src/UIO.hs#L34)
+can give you a handful hand to show virtually any value to the log box in UI.
+(You know the
+[Display](https://www.stackage.org/haddock/lts/rio/RIO.html#t:Display)
+typeclass, don't you?) And you can always do
+[liftIO](https://www.stackage.org/haddock/lts/base/Control-Monad-IO-Class.html#v:liftIO)
+or similar to obtain a value within a `do` block as necessary.
+
+And the `UIO` module re-exports
+[RIO](https://www.stackage.org/haddock/lts/rio/RIO.html)
+, so you can use it for
+[Prelude replacement](https://github.com/commercialhaskell/rio#prelude-replacement)
+as well as `RIO`.
+
 ## Quick Start
 
 - create a stack project with `hadui` as one of its dependencies,
