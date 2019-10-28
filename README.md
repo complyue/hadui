@@ -170,6 +170,14 @@ stack build --exec hadui-dev
 > backend process will be restarted, and changed project source
 > get recompiled automatically.
 
+- and you are good to go
+
+open http://localhost:5050
+
+![hadui-hello](https://user-images.githubusercontent.com/15646573/67655747-a5912000-f98c-11e9-955e-4a4289080aed.png)
+
+![hadui-hello-be](https://user-images.githubusercontent.com/15646573/67656467-d83c1800-f98e-11e9-97cb-f7dd82de48bf.png)
+
 - optionally, customize front UI for your project, by creating a
   `hadui` folder besides your `stack.yaml`.
 
@@ -185,6 +193,16 @@ stack build --exec hadui-dev
     ![hadui-stateful-rating](https://user-images.githubusercontent.com/15646573/67364543-55881700-f5a2-11e9-9499-10a488e2c818.png)
 
   - the [updateRank js method](https://github.com/complyue/hadui-demo/blob/master/hadui/hadui-custom.js#L41) is shared by above 2 examples to update UI from Haskell code.
+
+- wanna your own front page ?
+
+just create `hadui/front.html`
+
+> all resources under https://github.com/complyue/hadui/tree/stable/hadui/web
+> can be preceded by placing a same named file under your project's `hadui`
+> folder. there be `front.html` of just symlink to `dev.html`, with your own
+> front page inplace, you can still access the good old dev page at:
+> http://localhost:5050/dev.html
 
 ## VSCode Integration
 
