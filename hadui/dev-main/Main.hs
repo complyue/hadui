@@ -37,7 +37,7 @@ main = do
     let haduiResRoot = dataDir </> "web"
     D.doesDirectoryExist haduiResRoot >>= \case
         True -> return ()
-        _    -> error "hadui web resource directory missing ?!"
+        _    -> error "Hadui web resource directory missing ?!"
 
     lo <- haduiBackendLogOpts cfg
     withLogFunc lo $ \lf ->
@@ -62,9 +62,9 @@ runDevServer haduiResRoot = do
     devs <- ask
     let cfg = haduiConfig devs
 
-    logDebug $ "hadui using resource dir: [" <> fromString haduiResRoot <> "]"
+    logDebug $ "Hadui using resource dir: [" <> fromString haduiResRoot <> "]"
     logInfo
-        $  "hadui developing project at ["
+        $  "Hadui developing project at ["
         <> fromString (haduiProjectRoot devs)
         <> "]"
 
@@ -88,7 +88,7 @@ runDevServer haduiResRoot = do
             runRIO devs
                 $  logDebug
                 $  display
-                $  "hadui started dev process pid: "
+                $  "Hadui started dev process pid: "
                 <> tshow pid
 
             -- say sth on exit of the subprocess, this also prevents
@@ -100,20 +100,20 @@ runDevServer haduiResRoot = do
                     Just (Exited ExitSuccess) ->
                         logDebug
                             $  display
-                            $  "hadui dev process "
+                            $  "Hadui dev process "
                             <> tshow pid
                             <> " exited."
                     Just (Exited exitCode) ->
                         logError
                             $  display
-                            $  "hadui dev process "
+                            $  "Hadui dev process "
                             <> tshow pid
                             <> " exited with "
                             <> tshow exitCode
                     Just (Terminated sig coreDumped) ->
                         logWarn
                             $  display
-                            $  "hadui dev process "
+                            $  "Hadui dev process "
                             <> tshow pid
                             <> " killed by signal "
                             <> tshow sig
@@ -121,7 +121,7 @@ runDevServer haduiResRoot = do
                     Just (Stopped sig) ->
                         logWarn
                             $  display
-                            $  "hadui dev process "
+                            $  "Hadui dev process "
                             <> tshow pid
                             <> " stopped by signal "
                             <> tshow sig

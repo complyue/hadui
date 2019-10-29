@@ -4,7 +4,7 @@
 
 ## The Idea
 
-The idea behind hadui is rather simple, just to use a web browser in
+The idea behind Hadui is rather simple, just to use a web browser in
 place of the traditional terminal based console UI.
 
 And for simplicity, it's achieved by having the web page (i.e. the
@@ -35,7 +35,7 @@ stack build --exec hadui
 
 ## Orientation
 
-hadui is data science oriented, it is not suitable as a general purpose
+Hadui is data science oriented, it is not suitable as a general purpose
 web framework.
 
 All exported functions from all modules in the stack project of matter,
@@ -46,7 +46,7 @@ business workflows.
 ## Support (or lack thereof)
 
 Commercial support has not been planned, community is not formed yet,
-but hadui is an important part of my internal tool chain at work, it is:
+but Hadui is an important part of my internal tool chain at work, it is:
 
 - macOS - regularly used on Mojave
 - Linux - regularly used on Ubuntu 18.04
@@ -54,7 +54,7 @@ but hadui is an important part of my internal tool chain at work, it is:
 
 ### GHC and Stack
 
-hadui is geared to run upon the latest
+Hadui is geared to run upon the latest
 [LTS Haskell](https://www.stackage.org/lts)
 supported by Stackage, but currently an experimental version of
 [GHC 8.6.5](https://gitlab.haskell.org/complyue/ghc/tree/ghc-8.6-ife)
@@ -76,13 +76,13 @@ at time of speaking.
 
 ## (My) Typical Usage
 
-> I believe hadui can be useful in more ways for you and others, e.g.
+> I believe Hadui can be useful in more ways for you and others, e.g.
 > a version of [CodeWorld](https://code.world) capable to leverage
 > the computing power of a computing center on the cloud.
 >
 > (I had been faithful to use CodeWorld as frontend for my team, only
 > to find out it runs the program by the browser, i.e. all in frontend,
-> no backend. So comes hadui)
+> no backend. So comes Hadui)
 
 Data analysts use a browser to submit scripts (in native Haskell, for
 parameters, simple job control etc.) to trigger number crunching in
@@ -100,9 +100,9 @@ crunching code in stack projects.
 
 ![hadui-vscode-int-be](https://user-images.githubusercontent.com/15646573/67583167-ab64e680-f77d-11e9-8574-4d71fd290a25.png)
 
-## The UIO monad/module from package hadui
+## The UIO monad/module from package Hadui
 
-Haskell code from hadui UI runs in the `UIO` monad. It's pretty much the
+Haskell code from Hadui UI runs in the `UIO` monad. It's pretty much the
 same as `RIO` from the [rio](https://github.com/commercialhaskell/rio)
 library, with few addons like `print`/`uiLog`, and concrete `env` of type
 `UserInterfaceOutput`. It is essentially `ReaderT UserInterfaceOutput IO`,
@@ -146,15 +146,15 @@ dependencies:
   - hadui
 ```
 
-- in the project's `stack.yaml`, tell location of hadui within `extra-deps`,
+- in the project's `stack.yaml`, tell location of Hadui within `extra-deps`,
   and customize the compiler definition:
 
 ```yaml
 extra-deps:
-  # to use the version of hadui checked out locally
+  # to use the version of Hadui checked out locally
   #- ../hadui/hadui
 
-  # to use a version of hadui from github
+  # to use a version of Hadui from github
   - github: complyue/hadui
     commit: stable
     subdirs:
@@ -183,14 +183,14 @@ setup-info:
 - besides your `stack.yaml`, create `hadui.yaml`, like:
 
 ```yaml
-# this cfg file 'hadui.yaml' is located by hadui besides
-# the nearest 'stack.yaml' up from cwd you run hadui.
+# this cfg file 'hadui.yaml' is located by Hadui besides
+# the nearest 'stack.yaml' up from cwd you run Hadui.
 # it uses `stack path --project-root` to locate the dir.
 
 # by default, only the local interface is bound to listen
-# for hadui ws connections, this hardens the arbitrary
+# for Hadui ws connections, this hardens the arbitrary
 # code execution vulnerability a bit. but for you or your
-# collegues to access hadui web front from other machines,
+# collegues to access Hadui web front from other machines,
 # bind to one of the external interfaces, or simply all
 # interfaces by specifying '0.0.0.0'.
 bind-interface: 0.0.0.0

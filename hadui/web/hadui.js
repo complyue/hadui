@@ -15,11 +15,11 @@ export async function withHadui(haduiAct) {
 
 $(async function() {
   try {
-    uiLog("Dialing hadui backend ...");
+    uiLog("Dialing Hadui backend ...");
     await haduiWSC.dial();
   } catch (err) {
     let details = err ? err.stack : err;
-    uiLog("Failed connecting to hadui backend via ws.", "err-msg", details);
+    uiLog("Failed connecting to Hadui backend via ws.", "err-msg", details);
   }
 });
 

@@ -16,7 +16,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ParallelListComp #-}
 
--- | hadui runtime
+-- | Hadui runtime
 module HaduiRT
     ( MsgToUI(..)
     , uiLog
@@ -75,9 +75,9 @@ import qualified Paths_hadui                   as Meta
 -- The schema/protocol of json based communication is facilitated
 -- by `wsc.js`, where the command form:
 --  `{"type":"call", "method": "<name>", "args": <...>}`
--- is open at each hadui application's discrepancy.
+-- is open at each Hadui application's discrepancy.
 --
--- A hadui aware stack project implements websocket methods in 
+-- A Hadui aware stack project implements websocket methods in 
 -- `hadui/hadui-custom.js` under the root directory.
 uiComm :: A.ToJSON a => a -> UIO ()
 uiComm jsonCmd = do
@@ -233,7 +233,7 @@ haduiExecStmt stmt = do
 
             GHC.ExecComplete xResult _xAlloc -> case xResult of
                 Left exc -> runUIO uio $ do
-                    -- hadui is set to break-on-error, this should not happen,
+                    -- Hadui is set to break-on-error, this should not happen,
                     -- anyway log the unexpected error, just in case
                     let !errDetails = tshow exc
                     logWarn
@@ -253,7 +253,7 @@ haduiExecStmt stmt = do
 haduiServeWS :: UserInterfaceOutput -> WS.Connection -> IO ()
 haduiServeWS uio wsc = do
     runUIO uio $ withHaduiFront wsc $ uiLog $ DetailedMsg
-        "hadui ready for stack project at: "
+        "Hadui ready for stack project at: "
         (T.pack $ haduiProjectRoot uio)
     let
         keepServingPkt = do
@@ -266,11 +266,11 @@ haduiServeWS uio wsc = do
                         $ TL.toStrict pktText
                 (WS.Binary _bytes) -> do
                     runUIO uio
-                        $ logError "hadui received binary packet from ws ?!"
+                        $ logError "Hadui received binary packet from ws ?!"
                     WS.sendCloseCode wsc 1003 ("?!?" :: Text)
                 _ -> do
                     runUIO uio $ logError
-                        "hadui received unknown packet from ws ?!"
+                        "Hadui received unknown packet from ws ?!"
                     WS.sendCloseCode wsc 1003 ("?!?" :: Text)
             -- anyway we should continue receiving, even after close request sent, 
             -- we are expected to process a CloseRequest ctrl message from peer.
@@ -278,20 +278,20 @@ haduiServeWS uio wsc = do
     keepServingPkt `catch` \case
         WS.CloseRequest closeCode closeReason
             | closeCode == 1000 || closeCode == 1001 -> runUIO uio
-            $ logDebug "hadui ws closed normally."
+            $ logDebug "Hadui ws closed normally."
             | otherwise -> do
                 runUIO uio
                     $  logError
                     $  display
-                    $  "hadui ws closed with code "
+                    $  "Hadui ws closed with code "
                     <> display closeCode
                     <> " and reason ["
                     <> (Utf8Builder $ SB.lazyByteString closeReason)
                     <> "]"
                 -- yet still try to receive ctrl msg back from peer
                 haduiServeWS uio wsc
-        WS.ConnectionClosed -> runUIO uio $ logDebug "hadui ws disconnected."
-        _                   -> runUIO uio $ logError "hadui unexpected ws error"
+        WS.ConnectionClosed -> runUIO uio $ logDebug "Hadui ws disconnected."
+        _                   -> runUIO uio $ logError "Hadui unexpected ws error"
 
 
 haduiPubServer :: GHC.Ghc ()
@@ -299,18 +299,18 @@ haduiPubServer = do
     dataDir <- liftIO Meta.getDataDir
     let haduiResRoot = dataDir </> "web"
     unlessM (liftIO $ D.doesDirectoryExist haduiResRoot)
-        $ error "hadui web resource directory missing ?!"
+        $ error "Hadui web resource directory missing ?!"
 
     uio <- initUIO
 
     let cfg = haduiConfig uio
     runUIO uio $ do
         logDebug
-            $  "hadui using resource dir: ["
+            $  "Hadui using resource dir: ["
             <> fromString haduiResRoot
             <> "]"
         logInfo
-            $  "hadui publishing project at ["
+            $  "Hadui publishing project at ["
             <> fromString (haduiProjectRoot uio)
             <> "]"
 
@@ -365,7 +365,7 @@ haduiListenWSC cfg wscDisposer wscHandler = do
                               (conn, wsPeerAddr) <- accept listeningSock
                               runRIO env
                                   $  logDebug
-                                  $  "hadui ws accepted: "
+                                  $  "Hadui ws accepted: "
                                   <> display (tshow wsPeerAddr)
                               _ <- forkFinally (wscHandler conn) $ \wsResult ->
                                   do
@@ -373,7 +373,7 @@ haduiListenWSC cfg wscDisposer wscHandler = do
                                           Left exc ->
                                               runRIO env
                                                   $ logError
-                                                  $ "hadui failed with ws handling: "
+                                                  $ "Hadui failed with ws handling: "
                                                   <> display (tshow exc)
                                           Right _ -> pure ()
                                       wscDisposer conn
@@ -388,7 +388,7 @@ haduiListenWSC cfg wscDisposer wscHandler = do
             Left exc -> do
                 runRIO env
                     $  logError
-                    $  "hadui failed with ws listening: "
+                    $  "Hadui failed with ws listening: "
                     <> display (tshow exc)
                 exitImmediately $ ExitFailure 5
             Right _ -> pure ()
@@ -406,14 +406,14 @@ haduiServeHttp cfg prjRoot resRoot = do
                 $ Snap.setAccessLog Snap.ConfigNoLog
                 $ Snap.setErrorLog (Snap.ConfigIoLog logHttpError) mempty
         logHttpError msgBytes = case decodeUtf8' msgBytes of
-            Left  exc -> error $ "hadui unexpected encoding error: " ++ show exc
+            Left  exc -> error $ "Hadui unexpected encoding error: " ++ show exc
             Right msg -> runRIO env $ logError $ display msg
         httpListening httpInfo = do
             listenAddrs <- sequence
                 (getSocketName <$> Snap.getStartupSockets httpInfo)
             runRIO env
                 $  logInfo
-                $  "hadui available at: "
+                $  "Hadui available at: "
                 <> (display . T.unwords)
                        (("http://" <>) . tshow <$> listenAddrs)
 
@@ -448,7 +448,7 @@ haduiDevServer wsfd = do
         -- XXX it's not trivial to decied the fd is AF_INET or AF_INET6 here,
         -- but we wont't have to with network-3.x, mkSocket will take only fd.
         -- as far as lts stays with network-2.8, we blindly assume it's IPv4,
-        -- won't fix this if anyone suffers using IPv6 for hadui.
+        -- won't fix this if anyone suffers using IPv6 for Hadui.
         sock  <- mkSocket wsfd' AF_INET Stream defaultProtocol Connected
         pconn <- WS.makePendingConnection sock $ WS.defaultConnectionOptions
             { WS.connectionStrictUnicode = True
@@ -456,7 +456,7 @@ haduiDevServer wsfd = do
         wsc <- WS.acceptRequest pconn
         runUIO uio
             $  logDebug
-            $  "hadui development mode serving wsfd: "
+            $  "Hadui development mode serving wsfd: "
             <> display (tshow wsfd)
         haduiServeWS uio wsc
 

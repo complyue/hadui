@@ -15,7 +15,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuasiQuotes #-}
 
--- | hadui runtime
+-- | Hadui runtime
 module HaduiMonad
     ( UIO(..)
     , UserInterfaceOutput(..)
@@ -92,7 +92,7 @@ runUIO :: MonadIO m => UserInterfaceOutput -> UIO a -> m a
 runUIO uio (UIO (ReaderT f)) = liftIO (f uio)
 
 
--- | Every statement being executed dynamically by hadui, is unlifted
+-- | Every statement being executed dynamically by Hadui, is unlifted
 -- with this function into IO monad under the hood.
 --
 -- This very explicitly hints the expected monad type in the dynamic

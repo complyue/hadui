@@ -15,7 +15,7 @@ export function hasLogBox() {
 
 export function uiLog(msg, type = "msg", details = undefined) {
   if (!hasLogBox()) {
-    console.log("hadui:", type, msg, details);
+    console.log("Hadui:", type, msg, details);
     return;
   }
 

@@ -119,9 +119,9 @@ haduiGHCiCmdl :: HaduiConfig -> String -> [String] -> [String]
 haduiGHCiCmdl cfg fePluginName feArgs =
     -- the cmdl allowing copy&paste to bash prompt
     --                                     trace
-    -- (  "# --- begin hadui cmdl ---\n"
+    -- (  "# --- begin Hadui cmdl ---\n"
     -- <> T.pack (unwords [ "'" <> o <> "'" | o <- cmdl ])
-    -- <> "\n# === end hadui cmdl ==="
+    -- <> "\n# === end Hadui cmdl ==="
     -- )
                                         cmdl  where
     !ghcExecutable = T.unpack $ withGHC cfg
@@ -131,7 +131,7 @@ haduiGHCiCmdl cfg fePluginName feArgs =
             ++ [
 
 -- TODO stack will ask through the tty if multiple executables
--- are defined in the project, hadui won't play well in this
+-- are defined in the project, Hadui won't play well in this
 -- case. file an issue with stack, maybe introduce a new cmdl
 -- option to load all library modules with no question asked.
 
