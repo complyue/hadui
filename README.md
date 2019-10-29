@@ -13,14 +13,25 @@ frontend) keep life-long
 connection with the process run in background (i.e. the backend), and use
 text packets to:
 
-- in responding to user interactions with the web page, Haskell code
-  is sent from browser to backend process for execution.
-
 - in order to control the representation state in browser, json command is
   sent from the backend Haskell program to web page for execution.
 
+- in responding to user interactions with the web page, Haskell code
+  is sent from browser to backend process for execution.
+
 This is not that different per se from tradition IO to interact
 with a (simulated mostly nowadays) terminal via stdio.
+
+## Demo
+
+```shell
+git clone https://github.com/complyue/hadui-demo
+cd hadui-demo
+stack build --exec hadui
+```
+
+![hadui-demo-fe](https://user-images.githubusercontent.com/15646573/67366682-88340e80-f5a6-11e9-94b7-ed6c66cf428e.png)
+![hadui-demo-be](https://user-images.githubusercontent.com/15646573/67366681-88340e80-f5a6-11e9-99ea-a74e6ec54144.png)
 
 ## Orientation
 
@@ -292,14 +303,3 @@ Press `F7` (macOS) or `Ctrl+Shift+B` (Linux) to start `hadui-dev` for the projec
 ## Debugging with VSCode
 
 coming sooner than later ...
-
-## Demo
-
-```shell
-git clone https://github.com/complyue/hadui-demo
-cd hadui-demo
-stack build --exec hadui
-```
-
-![hadui-demo-fe](https://user-images.githubusercontent.com/15646573/67366682-88340e80-f5a6-11e9-94b7-ed6c66cf428e.png)
-![hadui-demo-be](https://user-images.githubusercontent.com/15646573/67366681-88340e80-f5a6-11e9-99ea-a74e6ec54144.png)
