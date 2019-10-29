@@ -18,6 +18,7 @@
 module HaduiCfg
     ( HaduiConfig(..)
     , loadHaduiConfig
+    , resolveHaduiResRoots
     , haduiBackendLogOpts
     , haduiGHCiCmdl
     )
@@ -63,11 +64,31 @@ loadHaduiConfig =
                                     Right cfg -> return (stackPrjRoot, cfg)
                 _ -> error "Can not determine stack project root."
 
+
+resolveHaduiResRoots :: [Text] -> IO [FilePath]
+resolveHaduiResRoots = mapM $ \pkg -> do
+    (ExitSuccess, outBytes, "") <- readProcessWithExitCode
+        "/usr/bin/env"
+        [ "stack"
+        , "exec"
+        , "ghc-pkg"
+        , "--"
+        , "field"
+        , "--simple-output"
+        , T.unpack (pkg)
+        , "data-dir"
+        ]
+        ""
+    let pkgDataDir = (T.unpack . T.strip . T.pack) outBytes
+    return $ pkgDataDir </> "web"
+
+
 data HaduiConfig = HaduiConfig {
     bindInterface :: Text
     , httpPort :: Int
     , wsPort :: Int
     , logLevel :: Text
+    , overlayPackages ::[Text]
     , withGHC :: Text
     , ghciOptions :: [Text]
     , ghcOptions :: [Text]
@@ -89,6 +110,9 @@ instance FromYAML HaduiConfig where
             <*> v
             .:? "log-level"
             .!= "INFO"
+            <*> v
+            .:? "overlay"
+            .!= []
             <*> v
             .:? "with-ghc"
             .!= "ghc"

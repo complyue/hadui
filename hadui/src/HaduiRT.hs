@@ -34,6 +34,7 @@ module HaduiRT
 where
 
 import           RIO
+import           RIO.List
 import qualified RIO.Text                      as T
 import qualified RIO.Text.Lazy                 as TL
 import           RIO.FilePath
@@ -417,25 +418,42 @@ haduiServeHttp cfg prjRoot resRoot = do
                 <> (display . T.unwords)
                        (("http://" <>) . tshow <$> listenAddrs)
 
-        dirServCfg   = Snap.fancyDirectoryConfig
-        prjResRoot   = prjRoot </> "hadui"
-        prjFrontFile = prjResRoot </> "front.html"
-        !wsPortBytes = encodeUtf8 $ tshow $ wsPort cfg
+        prjResRoot    = prjRoot </> "hadui"
+        prjFrontFile  = prjResRoot </> "front.html"
+        ootbFrontFile = resRoot </> "front.html"
+        !wsPortBytes  = encodeUtf8 $ tshow $ wsPort cfg
+        dirServCfg    = Snap.fancyDirectoryConfig
 
-    liftIO
-        $   Snap.httpServe httpCfg
-        -- serving ws port inquiry from js
-        $   Snap.path ":" (Snap.writeBS wsPortBytes)
-        -- map '/' to front.html in either directory
-        <|> Snap.path
-                ""
-                (liftIO (D.doesFileExist prjFrontFile) >>= \case
-                    True  -> Snap.serveFile prjFrontFile
-                    False -> Snap.serveFile (resRoot </> "front.html")
+    liftIO $ do
+        -- todo log the overlay dirs for debug purpose ?
+        overlayResRoots <- resolveHaduiResRoots $ overlayPackages cfg
+
+        Snap.httpServe httpCfg
+            -- serving ws port inquiry from js
+            $   Snap.path ":" (Snap.writeBS wsPortBytes)
+
+            -- map '/' to front.html from either the project of matter, or
+            -- hadui package OOTB
+            -- note front.html from any overlay package is not mapped to '/'
+            <|> Snap.path
+                    "" -- this is tested on each request ad-hoc, so no
+                    -- restart needed after the project add/rm the page
+                    (liftIO (D.doesFileExist prjFrontFile) >>= \case
+                        True  -> Snap.serveFile prjFrontFile
+                        False -> Snap.serveFile ootbFrontFile
+                    )
+
+            <|> (foldl
+                    (<|>)
+            -- resource files from the project of matter
+                    (Snap.serveDirectoryWith dirServCfg prjResRoot)
+
+            -- resource files from packages listed in the overlay cfg
+                    ((Snap.serveDirectoryWith dirServCfg) <$> overlayResRoots)
                 )
-        -- other static files
-        <|> Snap.serveDirectoryWith dirServCfg prjResRoot
-        <|> Snap.serveDirectoryWith dirServCfg resRoot
+
+            -- fallback lastly to OOTB resource root from the hadui package
+            <|> Snap.serveDirectoryWith dirServCfg resRoot
 
 
 haduiDevServer :: Int -> GHC.Ghc ()
