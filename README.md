@@ -19,7 +19,7 @@ text packets to:
 - in responding to user interactions with the web page, Haskell code
   is sent from browser to backend process for execution.
 
-This is not that different per se from tradition IO to interact
+This is fundamentally not different than tradition IO approach to interact
 with a (simulated mostly nowadays) terminal via stdio.
 
 ## Demo
