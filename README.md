@@ -88,8 +88,9 @@ Data analysts use a browser to submit scripts (in native Haskell, for
 parameters, simple job control etc.) to trigger number crunching in
 the backend (a single Haskell process or a swarm of computing nodes),
 and to see results plotted back to the browser - more windows opened
-to show [Bokeh](https://docs.bokeh.org) figures (this feature yet
-under construction).
+to show [Bokeh](https://bokeh.org) figures (with
+[Haze](https://github.com/complyue/haze) as a Hadui overlay package
+yet under construction).
 
 ![hadui-vscode-int-fe](https://user-images.githubusercontent.com/15646573/67581869-558f3f00-f77b-11e9-9e8a-c875a212c80b.png)
 
