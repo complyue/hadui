@@ -2,6 +2,26 @@
 
 [![Join the chat at https://gitter.im/hadui-web-front/community](https://badges.gitter.im/hadui-web-front/community.svg)](https://gitter.im/hadui-web-front/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
+## The Idea
+
+The idea behind hadui is rather simple, just to use a web browser in
+place of the traditional terminal based console UI.
+
+And for simplicity, it's achieved by having the web page (i.e. the
+frontend) keep life-long
+[WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API)
+connection with the process run in background (i.e. the backend), and use
+text packets to:
+
+- in responding to user interactions with the web page, Haskell code
+  is sent from browser to backend process for execution.
+
+- in order to control the representation state in browser, json command is
+  sent from the backend Haskell program to web page for execution.
+
+This is not that different per se from tradition IO to interact
+with a (simulated mostly nowadays) terminal via stdio.
+
 ## Orientation
 
 hadui is data science oriented, it is not suitable as a general purpose
