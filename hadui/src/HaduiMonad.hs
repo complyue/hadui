@@ -45,7 +45,7 @@ import           HaduiCfg
 -- those get filled with 'IoC' from UI widgets.
 newtype UIO a = UIO { unUIO :: ReaderT UserInterfaceOutput IO a }
     deriving (Functor, Applicative, Monad, MonadIO,
-        MonadReader UserInterfaceOutput, MonadThrow)
+        MonadReader UserInterfaceOutput, MonadThrow, MonadFail)
 
 -- | env of the UIO monad        
 data UserInterfaceOutput = UserInterfaceOutput {
