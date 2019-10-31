@@ -134,7 +134,7 @@ initUIO = do
         >>= GHC.setContext
         .   ((GHC.IIDecl $ GHC.simpleImportDecl $ GHC.mkModuleName "UIO") :)
     -- to allow string and number literals without explicit type anno
-    _ <- GHC.runDecls "default (Text,Int)"
+    _ <- GHC.runDecls "default (Text,Int,Double)"
 
     -- XXX this does not work, have to use -fbreak-on-error on launching cmdl
     --
