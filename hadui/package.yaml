@@ -24,6 +24,7 @@ dependencies:
   - process
   - network
   - websockets
+  - vector
 
   - base
   - rio

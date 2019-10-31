@@ -83,9 +83,9 @@ import qualified Paths_hadui                   as Meta
 uiComm :: A.ToJSON a => a -> UIO ()
 uiComm jsonCmd = do
     uio <- ask
-    let gil         = haduiGIL uio
--- aeson will crash the process if 'txtPayload' is lazy here
+    let -- 'A.encode' may crash the process if lazily called here
         !txtPayload = A.encode jsonCmd
+        gil         = haduiGIL uio
         txtPacket   = WS.Text txtPayload Nothing
     liftIO $ do
         noWSC <- isEmptyMVar gil
