@@ -96,9 +96,10 @@ yet under construction).
 ![hadui-vscode-int-fe](https://user-images.githubusercontent.com/15646573/67581869-558f3f00-f77b-11e9-9e8a-c875a212c80b.png)
 
 Programmers have `hadui-dev` as the default build tool run an ever going
-build task in their [HIE](https://github.com/haskell/haskell-ide-engine)
-enabled [VSCode](https://code.visualstudio.com) environment, to develop
-crunching code in stack projects.
+build task in their [VSCode](https://code.visualstudio.com) environment
+with [HIE](https://github.com/haskell/haskell-ide-engine) enabled via
+[VsCode extension for Haskell](https://github.com/alanz/vscode-hie-server)
+, to develop crunching code in stack projects.
 
 ![hadui-vscode-int-be](https://user-images.githubusercontent.com/15646573/67583167-ab64e680-f77d-11e9-8574-4d71fd290a25.png)
 
@@ -272,8 +273,9 @@ just create `hadui/front.html`
 
 ## VSCode Integration
 
-Setup your [VSCode](https://code.visualstudio.com) with
-[HIE](https://github.com/haskell/haskell-ide-engine)
+Setup your [VSCode](https://code.visualstudio.com) environment
+with [HIE](https://github.com/haskell/haskell-ide-engine) enabled via
+[VsCode extension for Haskell](https://github.com/alanz/vscode-hie-server)
 
 Create under the project root `.vscode/tasks.json` with following contents:
 
