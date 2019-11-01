@@ -26,18 +26,18 @@ import qualified Data.Aeson                    as A
 import           Foreign
 
 
-wsSendText :: A.ToJSON a => WS.Connection -> a -> IO ()
+wsSendText :: (MonadIO m, A.ToJSON a) => WS.Connection -> a -> m ()
 wsSendText wsc jsonCmd =
     -- 'A.encode' may crash the process if lazily called here
-    WS.sendDataMessage wsc $ flip WS.Text Nothing $! (A.encode jsonCmd)
+    liftIO $ WS.sendDataMessage wsc $ flip WS.Text Nothing $! (A.encode jsonCmd)
 
 wsSendData
-    :: forall a
-     . Storable a
+    :: forall m a
+     . (MonadIO m, Storable a)
     => WS.Connection
     -> VS.MVector (PrimState IO) a
-    -> IO ()
-wsSendData wsc arry = do
+    -> m ()
+wsSendData wsc arry = liftIO $ do
     let !itemSize    = sizeOf (undefined :: a)
         !(fptr, len) = VSM'.unsafeToForeignPtr0 arry
     -- we use unsafe coercion to ByteString here for zero-copy performance,
