@@ -171,8 +171,8 @@ export class WSC {
     });
   }
 
-  openWindow(url, target) {
-    window.open(url, target);
+  openWindow(url, windowName) {
+    window.open(url, windowName);
   }
 }
 
