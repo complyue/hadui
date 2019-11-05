@@ -44,35 +44,9 @@ import           HaduiCfg
 -- user inputs shall be facilitated with a registry of 'MVar's,
 -- those get filled with 'IoC' from UI widgets.
 newtype UIO a = UIO { unUIO :: ReaderT UserInterfaceOutput IO a }
-    deriving (Functor, Applicative, Monad, MonadIO,
-        MonadReader UserInterfaceOutput, MonadThrow, MonadFail)
-
--- | env of the UIO monad        
-data UserInterfaceOutput = UserInterfaceOutput {
-    -- | root directory of the stack project of matter
-    haduiProjectRoot :: !FilePath
-
-    -- | configuration loaded from `hadui.yaml` at project root
-    , haduiConfig :: !HaduiConfig
-
-    -- | arbitrary state managed by convention of the project
-    , haduiAppData :: !(MVar (Maybe Dynamic))
-
-    -- | Global Interpreter Lock similar to Python's, but serializes
-    -- executions of ws packets only, a single ws packet can trigger
-    -- fully fledged concurrency and parallelism in contrast to Python.
-    --
-    -- If a UIO action starts concurrent compution threads, and such
-    -- a thread shall comm back to its originating ws, it must save
-    -- the contextual websocket in GIL atm it's started.
-    , haduiGIL :: !(MVar  WS.Connection)
-
-    -- | the underlying log function to implement rio's HasLogFunc
-    , haduiBackendLogFunc :: !LogFunc
-
-    -- | GHC session used to execute statements by dynamic compilation
-    , haduiGhcSession :: !GHC.Session
-    }
+    deriving (Functor, Applicative, Monad,
+        MonadReader UserInterfaceOutput,
+        MonadIO, MonadThrow, MonadFail)
 
 instance MonadUnliftIO UIO where
     askUnliftIO = UIO $ ReaderT $ \r ->
@@ -108,6 +82,33 @@ _globalUIO :: IORef UserInterfaceOutput
 {-# NOINLINE _globalUIO #-}
 _globalUIO = unsafePerformIO $ newIORef undefined
 
+
+-- | env of the UIO monad        
+data UserInterfaceOutput = UserInterfaceOutput {
+    -- | root directory of the stack project of matter
+    haduiProjectRoot :: !FilePath
+
+    -- | configuration loaded from `hadui.yaml` at project root
+    , haduiConfig :: !HaduiConfig
+
+    -- | arbitrary state managed by convention of the project
+    , haduiAppData :: !(MVar (Maybe Dynamic))
+
+    -- | Global Interpreter Lock similar to Python's, but serializes
+    -- executions of ws packets only, a single ws packet can trigger
+    -- fully fledged concurrency and parallelism in contrast to Python.
+    --
+    -- If a UIO action starts concurrent compution threads, and such
+    -- a thread shall comm back to its originating ws, it must save
+    -- the contextual websocket in GIL atm it's started.
+    , haduiGIL :: !(MVar  WS.Connection)
+
+    -- | the underlying log function to implement rio's HasLogFunc
+    , haduiBackendLogFunc :: !LogFunc
+
+    -- | GHC session used to execute statements by dynamic compilation
+    , haduiGhcSession :: !GHC.Session
+    }
 
 -- | Initialize global UIO context with the calling Ghc Monad
 initUIO :: GHC.Ghc UserInterfaceOutput
