@@ -16,9 +16,9 @@ import           UIO
 
 import qualified RIO.ByteString.Lazy           as BL
 import qualified RIO.Vector.Storable           as VS
+import qualified RIO.Vector.Storable.Unsafe    as VS'
 
 import qualified Data.ByteString.Unsafe        as B'
-import qualified Data.Vector.Storable.Mutable  as VSM'
 
 import qualified Network.WebSockets            as WS
 import qualified Data.Aeson                    as A
@@ -39,7 +39,7 @@ wsSendData
     :: forall m a
      . (MonadIO m, Storable a)
     => WS.Connection
-    -> VS.MVector (PrimState IO) a
+    -> VS.Vector a
     -> m ()
 wsSendData wsc arry = liftIO $ withForeignPtr fptr $ \ptr -> do
     -- we use unsafe coercion to ByteString here for zero-copy performance,
@@ -50,5 +50,5 @@ wsSendData wsc arry = liftIO $ withForeignPtr fptr $ \ptr -> do
   where
     !itemSize    = sizeOf (undefined :: a)
     -- it's safe to use 'unsafeToForeignPtr0' as we never write to it here
-    !(fptr, len) = VSM'.unsafeToForeignPtr0 arry
+    !(fptr, len) = VS'.unsafeToForeignPtr0 arry
 
