@@ -20,9 +20,11 @@ text packets to:
   is sent from browser to backend process for execution.
 
 This is fundamentally not different than tradition IO approach to implement
-Terminal/Text UI for a (simulated mostly nowadays) terminal via stdio, only
-more flexible as it's inherently easier to extend the **json commands**
-and **Haskell statements** which substitue the
+Terminal/Text UI for a
+[(emulated)](https://en.wikipedia.org/wiki/Terminal_emulator)
+[terminal](https://en.wikipedia.org/wiki/Computer_terminal)
+via stdio, only more flexible as it's inherently easier to extend the
+**json commands** and **Haskell statements** which substitue the
 [ASCII control characters](https://en.wiktionary.org/wiki/Appendix:Control_characters)
 and
 [ANSI Escape sequences](http://ascii-table.com/ansi-escape-sequences.php)
