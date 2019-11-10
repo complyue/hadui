@@ -23,12 +23,15 @@ This is fundamentally not different than tradition IO approach to implement
 Terminal/Text UI for a
 [(emulated)](https://en.wikipedia.org/wiki/Terminal_emulator)
 [terminal](https://en.wikipedia.org/wiki/Computer_terminal)
-via stdio, only more flexible as it's inherently easier to extend the
-**json commands** and **Haskell statements** which substitue the
-[ASCII control characters](https://en.wiktionary.org/wiki/Appendix:Control_characters)
-and
+, only more flexible as it's inherently easier to extend the
+**json commands** (inplace of
 [ANSI Escape sequences](http://ascii-table.com/ansi-escape-sequences.php)
-used to interact with a terminal.
+) and **Haskell statements** (inplace of
+[ASCII control characters](https://en.wiktionary.org/wiki/Appendix:Control_characters)
+) compared to terminal based interactions via stdio, and not limited to one
+[tty](https://en.wikipedia.org/wiki/Text_terminal)
+per process - you can have many web pages open to interact with a single
+process.
 
 ## Demo
 
