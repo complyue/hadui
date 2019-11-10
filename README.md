@@ -19,8 +19,14 @@ text packets to:
 - in responding to user interactions with the web page, Haskell code
   is sent from browser to backend process for execution.
 
-This is fundamentally not different than tradition IO approach to interact
-with a (simulated mostly nowadays) terminal via stdio.
+This is fundamentally not different than tradition IO approach to implement
+Terminal/Text UI for a (simulated mostly nowadays) terminal via stdio, only
+more flexible as it's inherently easier to extend the **json commands**
+and **Haskell statements** which substitue the
+[ASCII control characters](https://en.wiktionary.org/wiki/Appendix:Control_characters)
+and
+[ANSI Escape sequences](http://ascii-table.com/ansi-escape-sequences.php)
+used to interact with a terminal.
 
 ## Demo
 
