@@ -63,6 +63,11 @@ but Hadui is an important part of my internal tool chain at work, it is:
 - Linux - regularly used on Ubuntu 18.04
 - Windows - should work in Docker in theory, not attempted yet
 
+### Nix
+
+[Cabal's view on developing multiple packages](https://www.haskell.org/cabal/users-guide/nix-local-build.html?highlight=project#developing-multiple-packages)
+[Stack's view on package versus project](https://docs.haskellstack.org/en/stable/stack_yaml_vs_cabal_package_file/#package-versus-project)
+
 ### GHC and Stack
 
 Hadui is geared to run upon the latest

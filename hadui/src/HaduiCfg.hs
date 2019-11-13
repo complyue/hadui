@@ -60,7 +60,7 @@ loadHaduiConfig =
                                     Left yamlErr ->
                                         error
                                             $  "Error with hadui.yaml "
-                                            <> yamlErr
+                                            <> (show yamlErr)
                                     Right cfg -> return (stackPrjRoot, cfg)
                 _ -> error "Can not determine stack project root."
 

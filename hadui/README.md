@@ -1,1 +1,1 @@
-# Web front UI for interactive stack projects
+# Web front UI for interactive Haskell projects

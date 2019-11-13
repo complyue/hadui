@@ -1,0 +1,170 @@
+cabal-version:      2.4
+name:               hadui
+version:            0.1.0.0
+license:            BSD-3-Clause
+license-file:       LICENSE
+copyright:          2019 Compl Yue
+maintainer:         compl.yue@icloud.com
+author:             Compl Yue
+stability:          experimental
+homepage:           https://github.com/complyue/hadui
+bug-reports:        https://github.com/complyue/hadui/issues
+synopsis:           Web front UI for interactive Haskell projects
+description:
+    Please see the README on Github at <https://github.com/complyue/hadui>
+
+category:           Interactive,Development,Web,UI
+build-type:         Simple
+data-files:
+-- while Cabal 3.0.0.0 does it well,
+-- unfortunately Cabal 2.4.0.1 bundled with GHC 8.6.5 fails
+-- handling double star wildcards like this, 
+    -- web/**/*.html
+    -- web/**/*.js
+    -- web/**/*.css
+    -- web/**/*.png
+-- as Nix builds by compiling `Setup.hs` directly against
+-- GHC's core Cabal library, we have to explicitly list
+-- all files like this by far.
+    web/hadui-custom.js
+    web/log.js
+    web/wsc.js
+    web/hadui.css
+    web/dev.html
+    web/hadui-custom.css
+    web/favicon.png
+    web/dev.js
+    web/hadui.js
+    web/ts.js
+    web/vendor/jquery/jquery.js
+    web/vendor/mui/mui.min.js
+    web/vendor/mui/README.md
+    web/vendor/mui/mui.min.css
+    web/vendor/cm/mode/haskell.js
+    web/vendor/cm/theme/elegant.css
+    web/vendor/cm/theme/monokai.css
+    web/vendor/cm/keymap/sublime.js
+    web/vendor/cm/keymap/emacs.js
+    web/vendor/cm/keymap/vim.js
+    web/vendor/cm/lib/codemirror.js
+    web/vendor/cm/lib/codemirror.css
+    web/vendor/cm/addon/comment/continuecomment.js
+    web/vendor/cm/addon/comment/comment.js
+    web/vendor/cm/addon/search/matchesonscrollbar.js
+    web/vendor/cm/addon/search/jump-to-line.js
+    web/vendor/cm/addon/search/match-highlighter.js
+    web/vendor/cm/addon/search/searchcursor.js
+    web/vendor/cm/addon/search/search.js
+    web/vendor/cm/addon/search/matchesonscrollbar.css
+    web/vendor/cm/addon/dialog/dialog.js
+    web/vendor/cm/addon/dialog/dialog.css
+    web/vendor/cm/addon/edit/continuelist.js
+    web/vendor/cm/addon/edit/closetag.js
+    web/vendor/cm/addon/edit/matchtags.js
+    web/vendor/cm/addon/edit/closebrackets.js
+    web/vendor/cm/addon/edit/matchbrackets.js
+    web/vendor/cm/addon/edit/trailingspace.js
+    web/vendor/cm/addon/wrap/hardwrap.js
+    web/vendor/cm/addon/fold/xml-fold.js
+    web/vendor/cm/addon/fold/foldgutter.js
+    web/vendor/cm/addon/fold/brace-fold.js
+    web/vendor/cm/addon/fold/comment-fold.js
+    web/vendor/cm/addon/fold/foldgutter.css
+    web/vendor/cm/addon/fold/markdown-fold.js
+    web/vendor/cm/addon/fold/foldcode.js
+    web/vendor/cm/addon/fold/indent-fold.js
+
+extra-source-files:
+    README.md
+    ChangeLog.md
+
+source-repository head
+    type:     git
+    location: https://github.com/complyue/hadui
+    branch:   stable
+    subdir:   hadui
+
+common shared-properties
+    default-language: Haskell2010
+    build-depends:
+        ghc >=8.6,
+        base >=4.12 && <5.0,
+
+        unix -any,
+        process -any,
+        -- TODO upgrade to 3.x after Stack LTS does
+        network >=2.8 && <3.0,
+        websockets -any,
+        snap-core -any,
+        snap-server -any,
+        -- TODO use acceleratehs array compatible blob types
+        vector -any,
+
+        rio -any,
+        text -any,
+        bytestring -any,
+        directory -any,
+        HsYAML -any,
+        aeson -any,
+        aeson-qq -any,
+        unliftio -any
+    ghc-options:
+        -Wall -Wcompat -Widentities -Wincomplete-record-updates
+        -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints
+
+common surface-properties
+    other-modules:
+        Paths_hadui
+
+library hadui-internal
+    import: shared-properties
+    hs-source-dirs: src
+    exposed-modules:
+        UIO
+        HaduiMonad
+        HaduiUtil
+        HaduiRT
+        HaduiCfg
+        HaduiDev
+        HaduiPub
+        Paths_hadui
+    autogen-modules:
+        Paths_hadui
+
+library
+    import:             shared-properties
+    import:             surface-properties
+    build-depends:      hadui-internal
+    reexported-modules:
+        UIO,
+        HaduiUtil,
+        HaduiMonad,
+        HaduiCfg,
+        HaduiRT,
+
+executable hadui
+    import:           shared-properties
+    import:           surface-properties
+    build-depends:    hadui-internal
+    main-is:          Main.hs
+    hs-source-dirs:   pub-main
+    ghc-options:
+        -- in publication mode, the `hadui` executable is just a
+        -- thin wrapper to launch `stack ghci` with 'HaduiPub' as
+        -- the interactive GHC frontend.
+        -- but more than 1 native threads could help avoiding quirks
+        -- in single-threaded cooperative scheduling.
+        -threaded -rtsopts -with-rtsopts=-maxN2
+
+executable hadui-dev
+    import:           shared-properties
+    import:           surface-properties
+    build-depends:    hadui-internal
+    main-is:          Main.hs
+    hs-source-dirs:   dev-main
+    ghc-options:
+        -- in development mode, the hadui process only handles light
+        -- http traffics, no need of much parallelism.
+        -- but more than 1 native threads could help avoiding quirks
+        -- in single-threaded cooperative scheduling.
+        -threaded -rtsopts -with-rtsopts=-maxN2
