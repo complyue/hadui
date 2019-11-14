@@ -6,3 +6,4 @@ stack.yaml.lock
 /dist/
 /dist-newstyle/
 result
+.ghc.environment*

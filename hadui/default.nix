@@ -14,5 +14,5 @@ mkDerivation {
   license = stdenv.lib.licenses.bsd3;
 
   # to workaround missing zlib.h problem during build
-  librarySystemDepends = [ pkgs.zlib ];
+  librarySystemDepends = [ pkgs.zlib pkgs.zlib-static ];
 }
