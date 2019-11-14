@@ -1,21 +1,24 @@
+# This is the Nix overlay to arm an experimental branch of GHC
+# as the default compiler, together with the full Haskell package
+# set (i.e. `haskellPackages`) with it.
+#
+# The compiler will be compiled from a source distribution, full
+# source of the branch is at this repository:
+#   https://gitlab.haskell.org/complyue/ghc/tree/ghc-8.6-ife
 self: super:
 let
 
-  # useful artifacts
-  inherit (super) haskell newScope fetchurl;
-  haskellLib = haskell.lib;
-
   # mock the env at (<nixpkgs> + /pkgs/top-level/haskell-packages)
-  callPackage = newScope {
-    inherit haskellLib;
-    overrides = haskell.packageOverrides;
+  callPackage = super.newScope {
+    haskellLib = super.haskell.lib;
+    overrides = super.pkgs.haskell.packageOverrides;
   };
 
   # the compiler
-  compiler865ife = haskell.compiler.ghc865.overrideAttrs (oldAttrs: {
+  compiler865ife = super.haskell.compiler.ghc865.overrideAttrs (oldAttrs: {
     name = "${oldAttrs.name}-ife";
 
-    src = fetchurl {
+    src = super.fetchurl {
       name = "ghc-8.6.5-ife-src.tar.xz";
       url =
         "https://gitlab.haskell.org/complyue/ghc-ife-sdist/raw/master/ghc-8.6.5-src.tar.xz";
@@ -26,7 +29,7 @@ let
   # the package set
   haskellPackages865ife =
     callPackage (<nixpkgs> + /pkgs/development/haskell-modules) {
-      buildHaskellPackages = haskell.packages.ghc865;
+      buildHaskellPackages = super.buildPackages.haskell.packages.ghc865ife;
       ghc = compiler865ife;
       compilerConfig = callPackage (<nixpkgs>
         + /pkgs/development/haskell-modules/configuration-ghc-8.6.x.nix) { };
@@ -40,8 +43,8 @@ in {
     packages = super.haskell.packages // { ghc865ife = haskellPackages865ife; };
   };
 
-  # make this the default Haskell package set,
-  # well the default can still be further overridden by other overlays
+  # make this the default Haskell package set
   haskellPackages = haskellPackages865ife;
+  # well the default can still be further overridden by other overlays
 
 }

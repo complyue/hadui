@@ -1,3 +1,6 @@
+# This is Nix expression for Hadui the package.
+# The spec for Nix is minimal, consult `hadui.cabal`
+# for the full details.
 { pkgs, stdenv, haskellPackages, mkDerivation }:
 with haskellPackages;
 mkDerivation {
