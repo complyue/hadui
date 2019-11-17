@@ -3,10 +3,7 @@ resolver: lts-14.14
 packages:
   - hadui
 
-# Stack's Nix integration not working well so far, when building
-# with stack, always run `stack build` within `nix-shell` for now.
-# here to disable Stack's Nix integration and force it to use
-# the GHC provided by Nix on PATH
 system-ghc: true
 nix:
-  enable: false
+  enable: true
+  packages: [zlib]
