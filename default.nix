@@ -12,8 +12,11 @@
 let
   haduiOverlay = self: super:
     let
-      hpsWithHadui = super.haskellPackages.extend
-        (super.haskell.lib.packageSourceOverrides { hadui = ./hadui; });
+      hpsWithHadui = super.haskellPackages.override {
+          overrides = hself: hsuper: {
+            hadui = hself.callCabal2nix "hadui" ./hadui {};
+          };
+      };
     in {
       # the top-level Nix package for Hadui
       hadui = hpsWithHadui.hadui;
