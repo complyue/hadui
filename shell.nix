@@ -5,5 +5,5 @@ haskellPackages.shellFor {
   nativeBuildInputs = [
     pkgs.cabal-install
   ];
-  # withHoogle = true;
+  withHoogle = true;
 }
