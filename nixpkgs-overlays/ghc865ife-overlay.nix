@@ -16,14 +16,22 @@ let
 
   # the compiler
   compiler865ife = super.haskell.compiler.ghc865.overrideAttrs (oldAttrs: {
-    name = "${oldAttrs.name}-ife";
 
-    src = super.fetchurl {
-      name = "ghc-8.6.5-ife-src.tar.xz";
-      url =
-        "https://gitlab.haskell.org/complyue/ghc-ife-sdist/raw/master/ghc-8.6.5-src.tar.xz";
-      sha256 = "0wf5v1ry3rlwhbsxlvka3qscdb4jz4jn7w3jckvwysh0fm1bavs5";
-    };
+# use the official tarbal for reprod in
+#   https://github.com/NixOS/nixpkgs/issues/73443
+src = fetchurl {
+  url = "https://downloads.haskell.org/~ghc/8.6.5/ghc-8.6.5-src.tar.xz";
+  sha256 = "0qg3zsmbk4rkwkc3jpas3zs74qaxmw4sp4v1mhsbj0a0dzls2jjd";
+};
+
+    # name = "${oldAttrs.name}-ife";
+
+    # src = super.fetchurl {
+    #   name = "ghc-8.6.5-ife-src.tar.xz";
+    #   url =
+    #     "https://gitlab.haskell.org/complyue/ghc-ife-sdist/raw/master/ghc-8.6.5-src.tar.xz";
+    #   sha256 = "0wf5v1ry3rlwhbsxlvka3qscdb4jz4jn7w3jckvwysh0fm1bavs5";
+    # };
   });
 
   # the package set
