@@ -15,6 +15,6 @@ import           HaduiCfg
 
 main :: IO ()
 main = do
-    (_stackPrjRoot, cfg) <- loadHaduiConfig
+    prj <- loadHaduiConfig
 
-    executeFile "/usr/bin/env" False (haduiGHCiCmdl cfg "HaduiPub" []) Nothing
+    executeFile "/usr/bin/env" False (haduiGHCiCmdl prj "HaduiPub" []) Nothing

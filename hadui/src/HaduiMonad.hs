@@ -115,14 +115,15 @@ initUIO :: GHC.Ghc UserInterfaceOutput
 initUIO = do
     ghcSession <- GHC.reifyGhc return
     uio        <- liftIO $ do
-        (stackPrjRoot, cfg) <- loadHaduiConfig
-        appData             <- newMVar Nothing
-        gil                 <- newEmptyMVar
-        lo                  <- haduiBackendLogOpts cfg
+        prj     <- loadHaduiConfig
+        appData <- newMVar Nothing
+        gil     <- newEmptyMVar
+        let !cfg = haduiCfg prj
+        lo               <- haduiBackendLogOpts cfg
         -- may need to teardown 'lf' on process exit, once the log target
         -- needs that, not needed as far as we only log to stderr.
-        (lf, _ :: IO ())    <- newLogFunc lo
-        return UserInterfaceOutput { haduiProjectRoot    = stackPrjRoot
+        (lf, _ :: IO ()) <- newLogFunc lo
+        return UserInterfaceOutput { haduiProjectRoot    = projectRoot prj
                                    , haduiConfig         = cfg
                                    , haduiAppData        = appData
                                    , haduiGIL            = gil

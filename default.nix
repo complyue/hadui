@@ -8,7 +8,7 @@
 # 
 # nix-env -iA hadui -f https://github.com/complyue/hadui/archive/0.1.0.0.tar.gz
 # 
-{ ... }@args:
+{ overlays ? [], ... }@args:
 let
   haduiOverlay = self: super:
     let
@@ -26,7 +26,7 @@ let
         packages = super.haskell.packages // { ghcWithHadui = hpsWithHadui; };
       };
     };
-in import <nixpkgs> ({
+in import <nixpkgs> (args // {
   overlays = [
     # this overlay creates & sets-default a new Haskell package
     # set (i.e. `haskellPackages`), with the experimental GHC
@@ -39,5 +39,5 @@ in import <nixpkgs> ({
     # `haskellPackages.hadui`) included. Hadui the package
     # is also made available at top-level of nixpkgs.
     haduiOverlay
-  ];
-} // args)
+  ] ++ (args.overlays or []);
+})

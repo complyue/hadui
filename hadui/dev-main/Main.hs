@@ -31,25 +31,26 @@ import qualified Paths_hadui                   as Meta
 
 main :: IO ()
 main = do
-    (stackPrjRoot, cfg) <- loadHaduiConfig
+    prj     <- loadHaduiConfig
 
-    dataDir             <- Meta.getDataDir
+    dataDir <- Meta.getDataDir
     let haduiResRoot = dataDir </> "web"
     D.doesDirectoryExist haduiResRoot >>= \case
         True -> return ()
         _    -> error "Hadui web resource directory missing ?!"
 
+    let !cfg = haduiCfg prj
     lo <- haduiBackendLogOpts cfg
     withLogFunc lo $ \lf ->
-        let devApp = HaduiDevServer { haduiProjectRoot = stackPrjRoot
-                                    , haduiConfig      = cfg
+        let devApp = HaduiDevServer { haduiProjectRoot = projectRoot prj
+                                    , haduiPrj         = prj
                                     , haduiDevLogFunc  = lf
                                     }
         in  runRIO devApp $ runDevServer haduiResRoot
 
 data HaduiDevServer = HaduiDevServer {
     haduiProjectRoot :: FilePath
-    , haduiConfig :: !HaduiConfig
+    , haduiPrj :: !HaduiProject
     , haduiDevLogFunc :: !LogFunc
     }
 
@@ -60,7 +61,8 @@ instance HasLogFunc HaduiDevServer where
 runDevServer :: FilePath -> RIO HaduiDevServer ()
 runDevServer haduiResRoot = do
     devs <- ask
-    let cfg = haduiConfig devs
+    let !prj = haduiPrj devs
+        !cfg = haduiCfg prj
 
     logDebug $ "Hadui using resource dir: [" <> fromString haduiResRoot <> "]"
     logInfo
@@ -82,7 +84,7 @@ runDevServer haduiResRoot = do
             pid <- forkProcess $ executeFile
                 "/usr/bin/env"
                 False
-                (haduiGHCiCmdl cfg "HaduiDev" [show wsfd])
+                (haduiGHCiCmdl prj "HaduiDev" [show wsfd])
                 Nothing
 
             runRIO devs

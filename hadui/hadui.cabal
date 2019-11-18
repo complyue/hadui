@@ -1,4 +1,5 @@
 cabal-version:      2.4
+
 name:               hadui
 version:            0.1.0.0
 license:            BSD-3-Clause
@@ -26,6 +27,7 @@ data-files:
 -- as Nix builds by compiling `Setup.hs` directly against
 -- GHC's core Cabal library, we have to explicitly list
 -- all files like this by far.
+    web/front.html
     web/hadui-custom.js
     web/log.js
     web/wsc.js
@@ -141,6 +143,9 @@ library
         HaduiMonad,
         HaduiCfg,
         HaduiRT,
+        -- entry modules of GHC frontend plugin need to be exposed
+        HaduiDev,
+        HaduiPub,
 
 executable hadui
     import:           shared-properties

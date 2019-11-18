@@ -5,5 +5,4 @@ packages:
 
 system-ghc: true
 nix:
-  enable: true
-  packages: [zlib]
+  enable: false
