@@ -19,7 +19,7 @@ let
 
 # use the official tarbal for reprod in
 #   https://github.com/NixOS/nixpkgs/issues/73443
-src = fetchurl {
+src = super.fetchurl {
   url = "https://downloads.haskell.org/~ghc/8.6.5/ghc-8.6.5-src.tar.xz";
   sha256 = "0qg3zsmbk4rkwkc3jpas3zs74qaxmw4sp4v1mhsbj0a0dzls2jjd";
 };
