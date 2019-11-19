@@ -37,34 +37,48 @@ import qualified System.Directory              as D
 import           Data.YAML
 
 
+findHaduiPrjRoot :: IO (Maybe (FilePath, FilePath))
+findHaduiPrjRoot = D.getCurrentDirectory >>= searchPrjRoot  where
+    searchPrjRoot :: FilePath -> IO (Maybe (FilePath, FilePath))
+    searchPrjRoot d =
+        let yamlFile = d </> "hadui.yaml"
+        in  D.doesFileExist yamlFile >>= \case
+                True -> return $ Just (normalise d, yamlFile)
+                False ->
+                    let pd = takeDirectory d
+                    in  if pd == d -- reached filesystem root
+                            then return Nothing
+                            else searchPrjRoot pd
+
 loadHaduiConfig :: IO HaduiProject
-loadHaduiConfig = do
-    prjRoot         <- D.getCurrentDirectory
-    isNixProject_   <- D.doesFileExist $ prjRoot </> "shell.nix"
-    isCabalProject_ <- D.doesFileExist $ prjRoot </> "cabal.project"
-    isStackProject_ <- D.doesFileExist $ prjRoot </> "stack.yaml"
-    if not (isNixProject_ || isCabalProject_ || isStackProject_)
-        then error "Hadui should run from a Haskell project dir!"
-        else
-            let haduiYamlFile = prjRoot </> "hadui.yaml"
-            in  D.doesFileExist haduiYamlFile
-                >>= \case
-                        True -> withBinaryFile haduiYamlFile ReadMode $ \h ->
-                            do -- TODO can this be point-free ?
-                                bytes <- BL.hGetContents h
-                                return $! decode1 bytes
-                            -- following won't work coz laziness
-                            -- (fmap decode1 . BL.hGetContents)
-                        -- parse empty dict for all defaults
-                        _ -> return $ decode1 "{}"
-                >>= \case
-                        Left yamlErr ->
-                            error $ "Error with hadui.yaml " <> (show yamlErr)
-                        Right cfg -> return $ HaduiProject prjRoot
-                                                           isNixProject_
-                                                           isCabalProject_
-                                                           isStackProject_
-                                                           cfg
+loadHaduiConfig = findHaduiPrjRoot >>= \case
+    Nothing -> error
+        "Can not locate Hadui project root, forget to create 'hadui.yaml' ?"
+    Just (prjRoot, haduiYamlFile) -> do
+        hasBarePrj  <- D.doesFileExist $ prjRoot </> ".ghci"
+        hasCabalPrj <- D.doesFileExist $ prjRoot </> "cabal.project"
+        hasStackPrj <- D.doesFileExist $ prjRoot </> "stack.yaml"
+        if not (hasBarePrj || hasCabalPrj || hasStackPrj)
+            then
+                error
+                $ "Please define the type of your Hadui project by crafting one of [stack.yaml/cabal.project/.ghci] in dir ["
+                <> prjRoot
+                <> "]"
+            else
+                (withBinaryFile haduiYamlFile ReadMode $ \h -> do
+                        bytes <- BL.hGetContents h
+                        return $! decode1 bytes
+                    )
+                    >>= \case
+                            Left yamlErr ->
+                                error
+                                    $  "Error with hadui.yaml "
+                                    <> (show yamlErr)
+                            Right cfg -> return $ HaduiProject prjRoot
+                                                               hasBarePrj
+                                                               hasCabalPrj
+                                                               hasStackPrj
+                                                               cfg
 
 
 resolveHaduiResRoots :: [Text] -> IO [FilePath]
@@ -87,9 +101,9 @@ resolveHaduiResRoots = mapM $ \pkg -> do
 
 data HaduiProject = HaduiProject {
     projectRoot :: FilePath
-    , isNixProject :: Bool
-    , isCabalProject :: Bool
-    , isStackProject :: Bool
+    , hasBareProject :: Bool
+    , hasCabalProject :: Bool
+    , hasStackProject :: Bool
     , haduiCfg :: HaduiConfig
 } deriving (Eq,Show )
 
@@ -166,7 +180,7 @@ haduiGHCiCmdl prj fePluginName feArgs =
     -- )
                                         cmdl  where
     !cfg  = haduiCfg prj
-    !cmdl = if (isStackProject prj)
+    !cmdl = if (hasStackProject prj)
         then
 -- Stack based project
             ["stack", "ghci"]
@@ -208,7 +222,7 @@ haduiGHCiCmdl prj fePluginName feArgs =
                ++ [ ["--ghc-options", T.unpack opt] | opt <- ghcOptions cfg ]
                )
             ++ (map T.unpack $ ghciTargets cfg)
-        else if (isCabalProject prj)
+        else if (hasCabalProject prj)
             then
 -- Cabal based project
                 ["cabal", "v2-repl"]
@@ -238,7 +252,9 @@ haduiGHCiCmdl prj fePluginName feArgs =
 
 -- the frontend trigger
                    , "--repl-options"
-                   , "-e \":frontend " ++ fePluginName ++ "\""
+                   , "-e"
+                   , "--repl-options"
+                   , ":frontend " ++ fePluginName
                    ]
                 ++ (  concat
                    $  [ ["--repl-options", "-ffrontend-opt " ++ fea]
