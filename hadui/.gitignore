@@ -7,3 +7,4 @@ stack.yaml.lock
 /dist-newstyle/
 result
 .ghc.environment*
+cabal.project.local
