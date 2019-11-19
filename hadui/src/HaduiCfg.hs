@@ -99,6 +99,7 @@ data HaduiConfig = HaduiConfig {
     , wsPort :: Int
     , logLevel :: Text
     , overlayPackages ::[Text]
+    , ghciTargets :: [Text]
     , ghciOptions :: [Text]
     , ghcOptions :: [Text]
 } deriving (Eq,Show )
@@ -122,8 +123,11 @@ instance FromYAML HaduiConfig where
             .:? "overlay"
             .!= []
             <*> v
+            .:? "ghci-targets"
+            .!= []
+            <*> v
             .:? "ghci-options"
-            .!= ["-fobject-code"]
+            .!= []
             <*> v
             .:? "ghc-options"
             .!= []
@@ -141,13 +145,16 @@ haduiBackendLogOpts cfg = do
     return $ setLogMinLevel ll lo
 
 
--- stack tries to expose all artifacts from the underlying Haskell
--- project to GHCi, while cabal-install is rather conservative, so
--- we prefer stack over cabal here, as we are more application
+-- Stack tries to load all components from the underlying Haskell
+-- project into GHCi by default, while cabal-install mandatory the
+-- user to specify the target explicitly, so wrt ease of use,
+-- we prefer Stack over Cabal here, as we are more application
 -- oriented than library oriented. assuming those library users
--- who favor cabal-install over stack will not have `stack.yaml`
--- defined for the interactive Hadui project, and should enjoy
--- crafting a `.ghci` script to control artifact exposure.
+-- who favor Cabal over Stack will not have `stack.yaml` defined
+-- for the interactive Hadui project, or even without 
+-- `cabal.project` defined, they should enjoy crafting a `.ghci`
+-- script to control behavior of GHCi.
+--
 -- see: https://github.com/haskell/cabal/issues/5374
 haduiGHCiCmdl :: HaduiProject -> String -> [String] -> [String]
 haduiGHCiCmdl prj fePluginName feArgs =
@@ -161,7 +168,7 @@ haduiGHCiCmdl prj fePluginName feArgs =
     !cfg  = haduiCfg prj
     !cmdl = if (isStackProject prj)
         then
--- Stack project
+-- Stack based project
             ["stack", "ghci"]
             ++ [
 
@@ -202,9 +209,10 @@ haduiGHCiCmdl prj fePluginName feArgs =
                       | opt <- ghcOptions cfg
                       ]
                    )
+            ++ (ghciTargets cfg)
         else if (isCabalProject prj)
             then
--- Cabal project
+-- Cabal based project
                 ["cabal", "v2-repl"]
                 ++ [
 
@@ -245,8 +253,9 @@ haduiGHCiCmdl prj fePluginName feArgs =
                           | opt <- ghcOptions cfg
                           ]
                        )
+                ++ (ghciTargets cfg)
             else
--- Nix project or others
+-- barebone project
                 [ "ghci"
 
     -- use UIO which reexports RIO as prelude
