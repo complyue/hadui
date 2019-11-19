@@ -172,109 +172,112 @@ haduiGHCiCmdl prj fePluginName feArgs =
             ["stack", "ghci"]
             ++ [
 
-    -- TODO stack will ask through the tty if multiple executables
-    -- are defined in the project, Hadui won't play well in this
-    -- case. file an issue with stack, maybe introduce a new cmdl
-    -- option to load all library modules with no question asked.
+-- TODO stack will ask through the tty if multiple executables
+-- are defined in the project, Hadui won't play well in this
+-- case. file an issue with stack, maybe introduce a new cmdl
+-- option to load all library modules with no question asked.
 
-    -- use UIO which reexports RIO as prelude
+-- use UIO which reexports RIO as prelude
                  "--ghc-options"
                , "-XNoImplicitPrelude"
 
-    -- really hope that Haskell the language unify the string
-    -- types (with utf8 seems the norm) sooner than later
+-- really hope that Haskell the language unify the string
+-- types (with utf8 seems the norm) sooner than later
                , "--ghc-options"
                , "-XOverloadedStrings"
 
-    -- to allow literal Text/Int without explicit type anno
+-- to allow literal Text/Int without explicit type anno
                , "--ghc-options"
                , "-XExtendedDefaultRules"
 
-    -- to stop on uncaught errors
+-- to stop on uncaught errors
                , "--ghci-options"
                , "-fbreak-on-error"
 
-    -- the frontend trigger
+-- the frontend trigger
                , "--ghci-options"
                , "-e \":frontend " ++ fePluginName ++ "\""
                ]
-            ++ concat
-                   (  [ ["--ghci-options", "-ffrontend-opt " ++ fea]
-                      | fea <- feArgs
-                      ]
-                   ++ [ ["--ghci-options", T.unpack opt]
-                      | opt <- ghciOptions cfg
-                      ]
-                   ++ [ ["--ghc-options", T.unpack opt]
-                      | opt <- ghcOptions cfg
-                      ]
-                   )
-            ++ (ghciTargets cfg)
+            ++ (  concat
+               $  [ ["--ghci-options", "-ffrontend-opt " ++ fea]
+                  | fea <- feArgs
+                  ]
+               ++ [ ["--ghci-options", T.unpack opt]
+                  | opt <- ghciOptions cfg
+                  ]
+               ++ [ ["--ghc-options", T.unpack opt] | opt <- ghcOptions cfg ]
+               )
+            ++ (map T.unpack $ ghciTargets cfg)
         else if (isCabalProject prj)
             then
 -- Cabal based project
                 ["cabal", "v2-repl"]
                 ++ [
 
-    -- TODO stack will ask through the tty if multiple executables
-    -- are defined in the project, Hadui won't play well in this
-    -- case. file an issue with stack, maybe introduce a new cmdl
-    -- option to load all library modules with no question asked.
+-- TODO stack will ask through the tty if multiple executables
+-- are defined in the project, Hadui won't play well in this
+-- case. file an issue with stack, maybe introduce a new cmdl
+-- option to load all library modules with no question asked.
 
-    -- use UIO which reexports RIO as prelude
+-- use UIO which reexports RIO as prelude
                      "--repl-options"
                    , "-XNoImplicitPrelude"
 
-    -- really hope that Haskell the language unify the string
-    -- types (with utf8 seems the norm) sooner than later
+-- really hope that Haskell the language unify the string
+-- types (with utf8 seems the norm) sooner than later
                    , "--repl-options"
                    , "-XOverloadedStrings"
 
-    -- to allow literal Text/Int without explicit type anno
+-- to allow literal Text/Int without explicit type anno
                    , "--repl-options"
                    , "-XExtendedDefaultRules"
 
-    -- to stop on uncaught errors
+-- to stop on uncaught errors
                    , "--repl-options"
                    , "-fbreak-on-error"
 
-    -- the frontend trigger
+-- the frontend trigger
                    , "--repl-options"
                    , "-e \":frontend " ++ fePluginName ++ "\""
                    ]
-                ++ concat
-                       (  [ ["--repl-options", "-ffrontend-opt " ++ fea]
-                          | fea <- feArgs
-                          ]
-                       ++ [ ["--repl-options", T.unpack opt]
-                          | opt <- ghciOptions cfg
-                          ]
-                       ++ [ ["--repl-options", T.unpack opt]
-                          | opt <- ghcOptions cfg
-                          ]
-                       )
-                ++ (ghciTargets cfg)
+                ++ (  concat
+                   $  [ ["--repl-options", "-ffrontend-opt " ++ fea]
+                      | fea <- feArgs
+                      ]
+                   ++ [ ["--repl-options", T.unpack opt]
+                      | opt <- ghciOptions cfg
+                      ]
+                   ++ [ ["--repl-options", T.unpack opt]
+                      | opt <- ghcOptions cfg
+                      ]
+                   )
+                ++ (map T.unpack $ ghciTargets cfg)
             else
 -- barebone project
                 [ "ghci"
 
-    -- use UIO which reexports RIO as prelude
+-- make available hadui the package to GHCi
+                , "-package"
+                , "hadui"
+
+-- use UIO which reexports RIO as prelude
                 , "-XNoImplicitPrelude"
 
-    -- really hope that Haskell the language unify the string
-    -- types (with utf8 seems the norm) sooner than later
+-- really hope that Haskell the language unify the string
+-- types (with utf8 seems the norm) sooner than later
                 , "-XOverloadedStrings"
 
-    -- to allow literal Text/Int without explicit type anno
+-- to allow literal Text/Int without explicit type anno
                 , "-XExtendedDefaultRules"
 
-    -- to stop on uncaught errors
+-- to stop on uncaught errors
                 , "-fbreak-on-error"
 
-    -- the frontend trigger
-                , "-e \":frontend " ++ fePluginName ++ "\""
+-- the frontend trigger
+                , "-e"
+                , ":frontend " ++ fePluginName
                 ]
-                ++ [ "-ffrontend-opt " ++ fea | fea <- feArgs ]
+                ++ concat [ ["-ffrontend-opt", fea] | fea <- feArgs ]
                 ++ [ T.unpack opt | opt <- ghciOptions cfg ]
                 ++ [ T.unpack opt | opt <- ghcOptions cfg ]
 
