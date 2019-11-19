@@ -85,15 +85,7 @@ resolveHaduiResRoots :: [Text] -> IO [FilePath]
 resolveHaduiResRoots = mapM $ \pkg -> do
     (ExitSuccess, outBytes, "") <- readProcessWithExitCode
         "/usr/bin/env"
-        [ "stack"
-        , "exec"
-        , "ghc-pkg"
-        , "--"
-        , "field"
-        , "--simple-output"
-        , T.unpack (pkg)
-        , "data-dir"
-        ]
+        ["ghc-pkg", "field", "--simple-output", T.unpack (pkg), "data-dir"]
         ""
     let pkgDataDir = (T.unpack . T.strip . T.pack) outBytes
     return $ pkgDataDir </> "web"
