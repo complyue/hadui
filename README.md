@@ -4,7 +4,7 @@
 
 ## Why Hadui
 
-> I had been faithful to use CodeWorld as frontend for my team, only
+> I had been faithful to use CodeWorld as the workbench for my team, only
 > to find out it runs the program by the browser, i.e. all in frontend,
 > no backend. So comes Hadui - web UI to Haskell programs in backend.
 
@@ -17,7 +17,7 @@ And for simplicity, it's achieved by having the web page (i.e. the
 frontend) keep life-long
 [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API)
 connection with the process run in background (i.e. the backend), and use
-text packets to:
+text packets for commu:
 
 - in order to control the representation state in browser, json command is
   sent from the backend Haskell program to web page for execution.
@@ -39,6 +39,9 @@ Terminal/Text UI for a
 per process - you can have many web pages open to interact with a single
 process.
 
+And a plus: binary packets/streams through the WebSocket can be used to
+communicate binary data efficiently between frontend and backend.
+
 ## Requirements
 
 With a rather small codebase, and the most extraordinary
@@ -48,10 +51,10 @@ and
 [snap-server](http://hackage.haskell.org/package/snap-server)
 , Hadui is no more than a vanilla Haskell program (with
 [rio](http://hackage.haskell.org/package/rio)
-as the replacement Prelude if you case), actually you can baked it
+as the replacement Prelude if you care), actually you can hack it
 all the way you'd like.
 
-While for productivity, in composing vast Haskell pieces into
+But for productivity, in composing vast Haskell pieces into
 an interactive context, with fast development iterations in mind, we
 choose to dynamicly compile & execute a Haskell project underlying.
 Therefore this
@@ -118,9 +121,10 @@ open or even prohibitive to support business workflows.
 
 ### GHC versions
 
-[The mod to add interactive frontend support to GHC](https://gitlab.haskell.org/complyue/ghc/tree/ghc-8.6-ife)
-is very light - simply added `:frontend` cmd to allow a
-[Frontend plugin](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/extending_ghc.html#frontend-plugins) be used with GHCi mode.
+The mod to add
+[interactive frontend support](https://gitlab.haskell.org/ghc/ghc/issues/17348)
+to GHC is very light - simply added `:frontend` cmd to allow a
+[Frontend plugin](https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/extending_ghc.html#frontend-plugins) be used with GHCi.
 
 I would be maintaining custom branches matching the GHC version chosen
 by latest
@@ -171,12 +175,12 @@ newtype UIO a = UIO { unUIO :: ReaderT UserInterfaceOutput IO a }
         MonadReader UserInterfaceOutput, MonadThrow)
 ```
 
-After all your code in the stack project has no necessarity to do with `UIO` at all,
+After all, your code in the stack project has no necessarity to do with `UIO` at all,
 [print :: Display a => a -> UIO ()](https://github.com/complyue/hadui/blob/master/hadui/src/UIO.hs#L34)
 can give you a handful hand to show virtually any value to the log box in UI.
-(You know the
+(check out the
 [Display](https://www.stackage.org/haddock/lts/rio/RIO.html#t:Display)
-typeclass, don't you?) And you can always do
+typeclass) And you can always do
 [liftIO](https://www.stackage.org/haddock/lts/base/Control-Monad-IO-Class.html#v:liftIO)
 or similar to obtain a value within a `do` block as necessary.
 
@@ -191,25 +195,26 @@ as well as `RIO`.
 After started the project you've created from any of the scaffolds as
 instructed above, open http://localhost:5050
 
-> in development mode (run `hadui-dev` instead of `hadui`), you just
-> refresh the browser page, the backend process will be restarted,
-> and changed project source get recompiled automatically.
+> Tip: there's development mode (run `hadui-dev` instead of `hadui`), where
+> you can just refresh the browser page after source modification in the project,
+> the backend process will be restarted, and changed source will be recompiled
+> automatically.
 
 ![hadui-hello](https://user-images.githubusercontent.com/15646573/67655747-a5912000-f98c-11e9-955e-4a4289080aed.png)
 
 ![hadui-hello-be](https://user-images.githubusercontent.com/15646573/67656467-d83c1800-f98e-11e9-97cb-f7dd82de48bf.png)
 
 - you customize front UI for your project, by having a
-  `hadui` folder besides your `hadui.yaml`.
+  `hadui` folder besides `hadui.yaml` under the project root.
 
   take for example:
   https://github.com/complyue/hadui-demo-stack/tree/master/hadui
 
-  - the [Rating.hs module](https://github.com/complyue/hadui-demo-stack/blob/master/demo/src/Rating.hs)
+  - the [Rating.hs module](https://github.com/complyue/hadui-demo-stack/blob/master/hadui-demo/src/Rating.hs)
     is paired with [rating.html page](https://github.com/complyue/hadui-demo-stack/blob/master/hadui/rating.html) to use state in frontend only.
     ![hadui-rating](https://user-images.githubusercontent.com/15646573/67364542-54ef8080-f5a2-11e9-946f-b4c88cfd8177.png)
 
-  - the [StatefulRating.hs module](https://github.com/complyue/hadui-demo-stack/blob/master/demo/src/StatefulRating.hs)
+  - the [StatefulRating.hs module](https://github.com/complyue/hadui-demo-stack/blob/master/hadui-demo/src/StatefulRating.hs)
     is paired with [stateful-rating.html page](https://github.com/complyue/hadui-demo-stack/blob/master/hadui/stateful-rating.html) to use state in backend.
     ![hadui-stateful-rating](https://user-images.githubusercontent.com/15646573/67364543-55881700-f5a2-11e9-9499-10a488e2c818.png)
 
@@ -231,7 +236,9 @@ Setup your [VSCode](https://code.visualstudio.com) environment
 with [HIE](https://github.com/haskell/haskell-ide-engine) enabled via
 [VsCode extension for Haskell](https://github.com/alanz/vscode-hie-server)
 
-There's already `.vscode/tasks.json` from the scaffold with following contents:
+Just open with VSCode the project you've created from one of the scaffold
+templates above, there's already `.vscode/tasks.json` from the scaffold with
+following contents:
 
 ```json
 {
