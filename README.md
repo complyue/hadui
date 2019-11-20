@@ -9,7 +9,7 @@
 > no backend. So comes Hadui - web UI to Haskell programs in backend.
 
 The idea behind Hadui is rather simple, just to use a web browser in
-place of the traditional terminal based console UI. After that, web
+place of the traditional terminal based console UI. Therefore, web
 technologies (HTML5/WebGL) based GUI & Visualization become native
 for Haskell programs.
 
