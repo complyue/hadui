@@ -17,7 +17,7 @@ And for simplicity, it's achieved by having the web page (i.e. the
 frontend) keep life-long
 [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API)
 connection with the process run in background (i.e. the backend), and use
-text packets for commu:
+text packets for comm:
 
 - in order to control the representation state in browser, json command is
   sent from the backend Haskell program to web page for execution.
