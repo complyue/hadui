@@ -119,7 +119,7 @@ Artifacts from the underlying project are exposed to frontend in a flat
 name space. This is ideal to support analytical workflows, but overly
 open or even prohibitive to support business workflows.
 
-### GHC versions
+## GHC versions
 
 The mod to add
 [interactive frontend support](https://gitlab.haskell.org/ghc/ghc/issues/17348)
