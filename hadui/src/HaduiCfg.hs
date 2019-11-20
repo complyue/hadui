@@ -82,13 +82,25 @@ loadHaduiConfig = findHaduiPrjRoot >>= \case
 
 
 resolveHaduiResRoots :: [Text] -> IO [FilePath]
-resolveHaduiResRoots = mapM $ \pkg -> do
-    (ExitSuccess, outBytes, "") <- readProcessWithExitCode
-        "/usr/bin/env"
-        ["ghc-pkg", "field", "--simple-output", T.unpack (pkg), "data-dir"]
-        ""
-    let pkgDataDir = (T.unpack . T.strip . T.pack) outBytes
-    return $ pkgDataDir </> "web"
+resolveHaduiResRoots = mapM $ \pkg ->
+    readProcessWithExitCode
+            "/usr/bin/env"
+            ["ghc-pkg", "field", "--simple-output", T.unpack (pkg), "data-dir"]
+            ""
+        >>= \case
+                (ExitSuccess, outBytes, "") ->
+                    let pkgDataDir = (T.unpack . T.strip . T.pack) outBytes
+                    in  return $ pkgDataDir </> "web"
+                (exitCode, out, err) ->
+                    error
+                        $  "Failed locating data-dir for package ["
+                        <> T.unpack pkg
+                        <> "], "
+                        <> show exitCode
+                        <> "\n"
+                        <> err
+                        <> "\n"
+                        <> out
 
 
 data HaduiProject = HaduiProject {
