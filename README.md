@@ -79,7 +79,7 @@ Windows is not well supported. Much the same Hadui is.
 [Install Nix](https://github.com/complyue/hadui/wiki/InstallNix) if not
 already.
 
-There're 3 types of Hadui project you can choose freely to start with,
+There're 3 flavors of Hadui project you can choose freely to start with,
 each with a scaffold template ready. To setup an interactive Haskell
 project with web UI:
 
