@@ -1,7 +1,7 @@
 cabal-version:      2.4
 
 name:               hadui
-version:            0.1.0.0
+version:            0.1.0.2
 license:            BSD-3-Clause
 license-file:       LICENSE
 copyright:          2019 Compl Yue
