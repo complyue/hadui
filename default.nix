@@ -27,7 +27,7 @@ let
       };
     };
 in import <nixpkgs> (args // {
-  overlays = [
+  overlays = (args.overlays or []) ++ [
     # this overlay creates & sets-default a new Haskell package
     # set (i.e. `haskellPackages`), with the experimental GHC
     # with interactive frontend support, which is mandatory
@@ -39,5 +39,5 @@ in import <nixpkgs> (args // {
     # `haskellPackages.hadui`) included. Hadui the package
     # is also made available at top-level of nixpkgs.
     haduiOverlay
-  ] ++ (args.overlays or []);
+  ];
 })
