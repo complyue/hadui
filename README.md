@@ -153,7 +153,7 @@ Programmers have `hadui-dev` as the default build tool run an ever going
 build task in their [VSCode](https://code.visualstudio.com) environment
 with [HIE](https://github.com/haskell/haskell-ide-engine) enabled via
 [VsCode extension for Haskell](https://github.com/alanz/vscode-hie-server)
-, to develop crunching code in stack projects.
+, to develop crunching code in Haskell projects.
 
 ![hadui-vscode-int-be](https://user-images.githubusercontent.com/15646573/67583167-ab64e680-f77d-11e9-8574-4d71fd290a25.png)
 
@@ -175,7 +175,7 @@ newtype UIO a = UIO { unUIO :: ReaderT UserInterfaceOutput IO a }
         MonadReader UserInterfaceOutput, MonadThrow)
 ```
 
-After all, your code in the stack project has no necessarity to do with `UIO` at all,
+After all, your code in the Haskell project has no necessarity to do with `UIO` at all,
 [print :: Display a => a -> UIO ()](https://github.com/complyue/hadui/blob/master/hadui/src/UIO.hs#L34)
 can give you a handful hand to show virtually any value to the log box in UI.
 (check out the
