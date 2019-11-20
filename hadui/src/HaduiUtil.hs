@@ -7,7 +7,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module HaduiUtil
-    ( wsSendText
+    ( wsSendJson
     , wsSendData
     )
 where
@@ -26,8 +26,8 @@ import qualified Data.Aeson                    as A
 import           Foreign
 
 
-wsSendText :: (MonadIO m, A.ToJSON a) => WS.Connection -> a -> m ()
-wsSendText wsc jsonCmd =
+wsSendJson :: (MonadIO m, A.ToJSON a) => WS.Connection -> a -> m ()
+wsSendJson wsc jsonCmd =
     liftIO
         $  WS.sendDataMessage wsc
         $  flip WS.Text Nothing
