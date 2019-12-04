@@ -4,9 +4,11 @@
 
 ## Why Hadui
 
-> I had been faithful to use CodeWorld as the workbench for my team, only
-> to find out it runs the program by the browser, i.e. all in frontend,
-> no backend. So comes Hadui - web UI to Haskell programs in backend.
+> I had been faithful to use [CodeWorld](https://code.world/haskell) as the
+> workbench for my team, but to find out that it runs the program by the browser,
+> i.e. all in frontend, no backend.
+>
+> So comes Hadui - web UI to Haskell programs in backend.
 
 The idea behind Hadui is rather simple, just to use a web browser in
 place of the traditional terminal based console UI. Therefore, web
@@ -200,9 +202,8 @@ instructed above, open http://localhost:5050
 > the backend process will be restarted, and changed source will be recompiled
 > automatically.
 
-![hadui-hello](https://user-images.githubusercontent.com/15646573/67655747-a5912000-f98c-11e9-955e-4a4289080aed.png)
-
-![hadui-hello-be](https://user-images.githubusercontent.com/15646573/67656467-d83c1800-f98e-11e9-97cb-f7dd82de48bf.png)
+![hadui-demo-fe](https://user-images.githubusercontent.com/15646573/70150770-7dac7f00-16e5-11ea-9b79-59b52d4efab0.png)
+![hadui-demo-be](https://user-images.githubusercontent.com/15646573/70150766-7dac7f00-16e5-11ea-9114-711c5ce32ca5.png)
 
 - you customize front UI for your project, by having a
   `hadui` folder besides `hadui.yaml` under the project root.
