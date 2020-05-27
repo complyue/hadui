@@ -16,13 +16,13 @@
 
 -- | hadui configuration
 module HaduiCfg
-    ( HaduiProject(..)
-    , HaduiConfig(..)
-    , loadHaduiConfig
-    , resolveHaduiResRoots
-    , haduiBackendLogOpts
-    , haduiGHCiCmdl
-    )
+  ( HaduiProject(..)
+  , HaduiConfig(..)
+  , loadHaduiConfig
+  , resolveHaduiResRoots
+  , haduiBackendLogOpts
+  , haduiGHCiCmdl
+  )
 where
 
 import           RIO
@@ -30,77 +30,74 @@ import qualified RIO.Text                      as T
 import qualified RIO.ByteString.Lazy           as BL
 import           RIO.FilePath
 
-import           UnliftIO.Process
-
 import qualified System.Directory              as D
+import           System.Process
 
 import           Data.YAML
 
 
 findHaduiPrjRoot :: IO (Maybe (FilePath, FilePath))
-findHaduiPrjRoot = D.getCurrentDirectory >>= searchPrjRoot  where
-    searchPrjRoot :: FilePath -> IO (Maybe (FilePath, FilePath))
-    searchPrjRoot d =
-        let yamlFile = d </> "hadui.yaml"
-        in  D.doesFileExist yamlFile >>= \case
-                True -> return $ Just (normalise d, yamlFile)
-                False ->
-                    let pd = takeDirectory d
-                    in  if pd == d -- reached filesystem root
-                            then return Nothing
-                            else searchPrjRoot pd
+findHaduiPrjRoot = D.getCurrentDirectory >>= searchPrjRoot where
+  searchPrjRoot :: FilePath -> IO (Maybe (FilePath, FilePath))
+  searchPrjRoot d =
+    let yamlFile = d </> "hadui.yaml"
+    in  D.doesFileExist yamlFile >>= \case
+          True -> return $ Just (normalise d, yamlFile)
+          False ->
+            let pd = takeDirectory d
+            in  if pd == d -- reached filesystem root
+                  then return Nothing
+                  else searchPrjRoot pd
 
 loadHaduiConfig :: IO HaduiProject
 loadHaduiConfig = findHaduiPrjRoot >>= \case
-    Nothing -> error
-        "Can not locate Hadui project root, forget to create 'hadui.yaml' ?"
-    Just (prjRoot, haduiYamlFile) -> do
-        hasBarePrj  <- D.doesFileExist $ prjRoot </> ".ghci"
-        hasCabalPrj <- D.doesFileExist $ prjRoot </> "cabal.project"
-        hasStackPrj <- D.doesFileExist $ prjRoot </> "stack.yaml"
-        if not (hasBarePrj || hasCabalPrj || hasStackPrj)
-            then
-                error
-                $ "Please define the type of your Hadui project by crafting one of [stack.yaml/cabal.project/.ghci] in dir ["
-                <> prjRoot
-                <> "]"
-            else
-                (withBinaryFile haduiYamlFile ReadMode $ \h -> do
-                        bytes <- BL.hGetContents h
-                        return $! decode1 bytes
-                    )
-                    >>= \case
-                            Left yamlErr ->
-                                error
-                                    $  "Error with hadui.yaml "
-                                    <> (show yamlErr)
-                            Right cfg -> return $ HaduiProject prjRoot
-                                                               hasBarePrj
-                                                               hasCabalPrj
-                                                               hasStackPrj
-                                                               cfg
+  Nothing ->
+    error "Can not locate Hadui project root, forget to create 'hadui.yaml' ?"
+  Just (prjRoot, haduiYamlFile) -> do
+    hasBarePrj  <- D.doesFileExist $ prjRoot </> ".ghci"
+    hasCabalPrj <- D.doesFileExist $ prjRoot </> "cabal.project"
+    hasStackPrj <- D.doesFileExist $ prjRoot </> "stack.yaml"
+    if not (hasBarePrj || hasCabalPrj || hasStackPrj)
+      then
+        error
+        $ "Please define the type of your Hadui project by crafting one of [stack.yaml/cabal.project/.ghci] in dir ["
+        <> prjRoot
+        <> "]"
+      else
+        (withBinaryFile haduiYamlFile ReadMode $ \h -> do
+            bytes <- BL.hGetContents h
+            return $! decode1 bytes
+          )
+          >>= \case
+                Left yamlErr ->
+                  error $ "Error with hadui.yaml " <> (show yamlErr)
+                Right cfg -> return $ HaduiProject prjRoot
+                                                   hasBarePrj
+                                                   hasCabalPrj
+                                                   hasStackPrj
+                                                   cfg
 
 
 resolveHaduiResRoots :: [Text] -> IO [FilePath]
 resolveHaduiResRoots = mapM $ \pkg ->
-    readProcessWithExitCode
-            "/usr/bin/env"
-            ["ghc-pkg", "field", "--simple-output", T.unpack (pkg), "data-dir"]
-            ""
-        >>= \case
-                (ExitSuccess, outBytes, "") ->
-                    let pkgDataDir = (T.unpack . T.strip . T.pack) outBytes
-                    in  return $ pkgDataDir </> "web"
-                (exitCode, out, err) ->
-                    error
-                        $  "Failed locating data-dir for package ["
-                        <> T.unpack pkg
-                        <> "], "
-                        <> show exitCode
-                        <> "\n"
-                        <> err
-                        <> "\n"
-                        <> out
+  readProcessWithExitCode
+      "/usr/bin/env"
+      ["ghc-pkg", "field", "--simple-output", T.unpack (pkg), "data-dir"]
+      ""
+    >>= \case
+          (ExitSuccess, outBytes, "") ->
+            let pkgDataDir = (T.unpack . T.strip . T.pack) outBytes
+            in  return $ pkgDataDir </> "web"
+          (exitCode, out, err) ->
+            error
+              $  "Failed locating data-dir for package ["
+              <> T.unpack pkg
+              <> "], "
+              <> show exitCode
+              <> "\n"
+              <> err
+              <> "\n"
+              <> out
 
 
 data HaduiProject = HaduiProject {
@@ -123,44 +120,44 @@ data HaduiConfig = HaduiConfig {
 } deriving (Eq,Show )
 
 instance FromYAML HaduiConfig where
-    parseYAML = withMap "HaduiConfig" $ \v ->
-        HaduiConfig
-            <$> v
-            .:? "bind-interface"
-            .!= "127.0.0.1"
-            <*> v
-            .:? "http-port"
-            .!= 5050
-            <*> v
-            .:? "ws-port"
-            .!= 5051
-            <*> v
-            .:? "log-level"
-            .!= "INFO"
-            <*> v
-            .:? "overlay"
-            .!= []
-            <*> v
-            .:? "ghci-targets"
-            .!= []
-            <*> v
-            .:? "ghci-options"
-            .!= []
-            <*> v
-            .:? "ghc-options"
-            .!= []
+  parseYAML = withMap "HaduiConfig" $ \v ->
+    HaduiConfig
+      <$> v
+      .:? "bind-interface"
+      .!= "127.0.0.1"
+      <*> v
+      .:? "http-port"
+      .!= 5050
+      <*> v
+      .:? "ws-port"
+      .!= 5051
+      <*> v
+      .:? "log-level"
+      .!= "INFO"
+      <*> v
+      .:? "overlay"
+      .!= []
+      <*> v
+      .:? "ghci-targets"
+      .!= []
+      <*> v
+      .:? "ghci-options"
+      .!= []
+      <*> v
+      .:? "ghc-options"
+      .!= []
 
 
 haduiBackendLogOpts :: HaduiConfig -> IO LogOptions
 haduiBackendLogOpts cfg = do
-    let ll = case logLevel cfg of
-            "DEBUG" -> LevelDebug
-            "WARN"  -> LevelWarn
-            "ERROR" -> LevelError
-            _       -> LevelInfo
-        verbose = ll < LevelWarn -- go verbose since info level
-    lo <- logOptionsHandle stderr verbose
-    return $ setLogMinLevel ll lo
+  let ll = case logLevel cfg of
+        "DEBUG" -> LevelDebug
+        "WARN"  -> LevelWarn
+        "ERROR" -> LevelError
+        _       -> LevelInfo
+      verbose = ll < LevelWarn -- go verbose since info level
+  lo <- logOptionsHandle stderr verbose
+  return $ setLogMinLevel ll lo
 
 
 -- Stack tries to load all components from the underlying Haskell
@@ -182,13 +179,13 @@ haduiGHCiCmdl prj fePluginName feArgs =
     -- <> T.pack (unwords [ "'" <> o <> "'" | o <- cmdl ])
     -- <> "\n# === end Hadui cmdl ==="
     -- )
-                                        cmdl  where
-    !cfg  = haduiCfg prj
-    !cmdl = if (hasStackProject prj)
-        then
+                                        cmdl where
+  !cfg  = haduiCfg prj
+  !cmdl = if (hasStackProject prj)
+    then
 -- Stack based project
-            ["stack", "ghci"]
-            ++ [
+      ["stack", "ghci"]
+      ++ [
 
 -- TODO stack will ask through the tty if multiple executables
 -- are defined in the project, Hadui won't play well in this
@@ -196,41 +193,37 @@ haduiGHCiCmdl prj fePluginName feArgs =
 -- option to load all library modules with no question asked.
 
 -- use UIO which reexports RIO as prelude
-                 "--ghc-options"
-               , "-XNoImplicitPrelude"
+           "--ghc-options"
+         , "-XNoImplicitPrelude"
 
 -- really hope that Haskell the language unify the string
 -- types (with utf8 seems the norm) sooner than later
-               , "--ghc-options"
-               , "-XOverloadedStrings"
+         , "--ghc-options"
+         , "-XOverloadedStrings"
 
 -- to allow literal Text/Int without explicit type anno
-               , "--ghc-options"
-               , "-XExtendedDefaultRules"
+         , "--ghc-options"
+         , "-XExtendedDefaultRules"
 
 -- to stop on uncaught errors
-               , "--ghci-options"
-               , "-fbreak-on-error"
+         , "--ghci-options"
+         , "-fbreak-on-error"
 
 -- the frontend trigger
-               , "--ghci-options"
-               , "-e \":frontend " ++ fePluginName ++ "\""
-               ]
-            ++ (  concat
-               $  [ ["--ghci-options", "-ffrontend-opt " ++ fea]
-                  | fea <- feArgs
-                  ]
-               ++ [ ["--ghci-options", T.unpack opt]
-                  | opt <- ghciOptions cfg
-                  ]
-               ++ [ ["--ghc-options", T.unpack opt] | opt <- ghcOptions cfg ]
-               )
-            ++ (map T.unpack $ ghciTargets cfg)
-        else if (hasCabalProject prj)
-            then
+         , "--ghci-options"
+         , "-e \":frontend " ++ fePluginName ++ "\""
+         ]
+      ++ (  concat
+         $  [ ["--ghci-options", "-ffrontend-opt " ++ fea] | fea <- feArgs ]
+         ++ [ ["--ghci-options", T.unpack opt] | opt <- ghciOptions cfg ]
+         ++ [ ["--ghc-options", T.unpack opt] | opt <- ghcOptions cfg ]
+         )
+      ++ (map T.unpack $ ghciTargets cfg)
+    else if (hasCabalProject prj)
+      then
 -- Cabal based project
-                ["cabal", "v2-repl"]
-                ++ [
+        ["cabal", "v2-repl"]
+        ++ [
 
 -- TODO stack will ask through the tty if multiple executables
 -- are defined in the project, Hadui won't play well in this
@@ -238,66 +231,60 @@ haduiGHCiCmdl prj fePluginName feArgs =
 -- option to load all library modules with no question asked.
 
 -- use UIO which reexports RIO as prelude
-                     "--repl-options"
-                   , "-XNoImplicitPrelude"
+             "--repl-options"
+           , "-XNoImplicitPrelude"
 
 -- really hope that Haskell the language unify the string
 -- types (with utf8 seems the norm) sooner than later
-                   , "--repl-options"
-                   , "-XOverloadedStrings"
+           , "--repl-options"
+           , "-XOverloadedStrings"
 
 -- to allow literal Text/Int without explicit type anno
-                   , "--repl-options"
-                   , "-XExtendedDefaultRules"
+           , "--repl-options"
+           , "-XExtendedDefaultRules"
 
 -- to stop on uncaught errors
-                   , "--repl-options"
-                   , "-fbreak-on-error"
+           , "--repl-options"
+           , "-fbreak-on-error"
 
 -- the frontend trigger
-                   , "--repl-options"
-                   , "-e"
-                   , "--repl-options"
-                   , ":frontend " ++ fePluginName
-                   ]
-                ++ (  concat
-                   $  [ ["--repl-options", "-ffrontend-opt " ++ fea]
-                      | fea <- feArgs
-                      ]
-                   ++ [ ["--repl-options", T.unpack opt]
-                      | opt <- ghciOptions cfg
-                      ]
-                   ++ [ ["--repl-options", T.unpack opt]
-                      | opt <- ghcOptions cfg
-                      ]
-                   )
-                ++ (map T.unpack $ ghciTargets cfg)
-            else
+           , "--repl-options"
+           , "-e"
+           , "--repl-options"
+           , ":frontend " ++ fePluginName
+           ]
+        ++ (  concat
+           $  [ ["--repl-options", "-ffrontend-opt " ++ fea] | fea <- feArgs ]
+           ++ [ ["--repl-options", T.unpack opt] | opt <- ghciOptions cfg ]
+           ++ [ ["--repl-options", T.unpack opt] | opt <- ghcOptions cfg ]
+           )
+        ++ (map T.unpack $ ghciTargets cfg)
+      else
 -- barebone project
-                [ "ghci"
+        [ "ghci"
 
 -- make available hadui the package to GHCi
-                , "-package"
-                , "hadui"
+        , "-package"
+        , "hadui"
 
 -- use UIO which reexports RIO as prelude
-                , "-XNoImplicitPrelude"
+        , "-XNoImplicitPrelude"
 
 -- really hope that Haskell the language unify the string
 -- types (with utf8 seems the norm) sooner than later
-                , "-XOverloadedStrings"
+        , "-XOverloadedStrings"
 
 -- to allow literal Text/Int without explicit type anno
-                , "-XExtendedDefaultRules"
+        , "-XExtendedDefaultRules"
 
 -- to stop on uncaught errors
-                , "-fbreak-on-error"
+        , "-fbreak-on-error"
 
 -- the frontend trigger
-                , "-e"
-                , ":frontend " ++ fePluginName
-                ]
-                ++ concat [ ["-ffrontend-opt", fea] | fea <- feArgs ]
-                ++ [ T.unpack opt | opt <- ghciOptions cfg ]
-                ++ [ T.unpack opt | opt <- ghcOptions cfg ]
+        , "-e"
+        , ":frontend " ++ fePluginName
+        ]
+        ++ concat [ ["-ffrontend-opt", fea] | fea <- feArgs ]
+        ++ [ T.unpack opt | opt <- ghciOptions cfg ]
+        ++ [ T.unpack opt | opt <- ghcOptions cfg ]
 

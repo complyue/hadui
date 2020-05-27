@@ -108,8 +108,7 @@ common shared-properties
         directory -any,
         HsYAML -any,
         aeson -any,
-        aeson-qq -any,
-        unliftio -any
+        aeson-qq -any
     ghc-options:
         -Wall -Wcompat -Widentities -Wincomplete-record-updates
         -Wincomplete-uni-patterns -Wpartial-fields -Wredundant-constraints

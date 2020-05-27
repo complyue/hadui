@@ -48,11 +48,6 @@ newtype UIO a = UIO { unUIO :: ReaderT UserInterfaceOutput IO a }
         MonadReader UserInterfaceOutput,
         MonadIO, MonadThrow, MonadFail)
 
-instance MonadUnliftIO UIO where
-    askUnliftIO = UIO $ ReaderT $ \r ->
-        withUnliftIO $ \u ->
-            return (UnliftIO (unliftIO u . flip runReaderT r . unUIO))
-
 instance PrimMonad UIO where
     type PrimState UIO = PrimState IO
     primitive = UIO . ReaderT . const . primitive
